@@ -1,23 +1,55 @@
 export default function Home() {
   return (
-    <div className="flex flex-col items-center justify-between h-screen bg-black text-white">
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: '100vh',
+      backgroundColor: 'white',
+      padding: '20px'
+    }}>
       {/* Center Logo */}
-      <div className="flex flex-1 items-center justify-center">
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
         <img
           src="/messenger_logo.jpg"
           alt="Messenger Logo"
-          className="w-[60px] h-[60px] object-contain"
+          style={{
+            width: '80px',
+            height: '80px',
+            objectFit: 'contain'
+          }}
         />
       </div>
 
-      {/* Bottom "From Meta" section */}
-      <div className="pb-8 text-center leading-none">
-        <p className="text-gray-400 font-semibold text-sm mb-[0px]">from</p>
-        <div className="flex items-center justify-center">
+      {/* Bottom From Meta - Placed at very bottom */}
+      <div style={{
+        textAlign: 'center',
+        marginBottom: '0px'
+      }}>
+        <p style={{
+          color: '#9CA3AF',
+          fontSize: '14px',
+          marginBottom: '0px'
+        }}>from</p>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
           <img
             src="/meta-logo.jpg"
             alt="Meta Logo"
-            className="w-[70px] h-[70px] object-contain"
+            style={{
+              width: '70px',
+              height: '70px',
+              objectFit: 'contain'
+            }}
           />
         </div>
       </div>

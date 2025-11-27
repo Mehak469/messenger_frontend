@@ -93,6 +93,7 @@ interface AppState {
   showMutedStories: boolean;
   chats: Chat[];
   messageRequests: any[];
+  pendingRequests: any[];
   archivedChats: any[];
   notifications: Notification[];
   activeChat: Chat | null;
@@ -113,6 +114,11 @@ interface AppState {
   recordingInterval: NodeJS.Timeout | null;
   isMobile: boolean;
   isTablet: boolean;
+  requestsActiveTab: string;
+  showSendRequestModal: boolean;
+  requestMessage: string;
+  selectedUserForRequest: any;
+  dummyUsers: any[];
 }
 
 // Initial data
@@ -236,6 +242,56 @@ const initialNotificationsData: Notification[] = [
   }
 ];
 
+// Enhanced dummy users with names starting with different letters A to Z
+const dummyUsers = [
+  { id: 101, name: "Ali Khan", avatar: "https://i.pravatar.cc/150?img=11" },
+  { id: 102, name: "Ahmed Raza", avatar: "https://i.pravatar.cc/150?img=12" },
+  { id: 103, name: "Ayesha Malik", avatar: "https://i.pravatar.cc/150?img=13" },
+  { id: 104, name: "Amina Sheikh", avatar: "https://i.pravatar.cc/150?img=14" },
+  { id: 105, name: "Bilal Shah", avatar: "https://i.pravatar.cc/150?img=15" },
+  { id: 106, name: "Babar Iqbal", avatar: "https://i.pravatar.cc/150?img=16" },
+  { id: 107, name: "Chaudhry Usman", avatar: "https://i.pravatar.cc/150?img=17" },
+  { id: 108, name: "Danish Ali", avatar: "https://i.pravatar.cc/150?img=18" },
+  { id: 109, name: "Fatima Noor", avatar: "https://i.pravatar.cc/150?img=19" },
+  { id: 110, name: "Faisal Mahmood", avatar: "https://i.pravatar.cc/150?img=20" },
+  { id: 111, name: "Hina Aslam", avatar: "https://i.pravatar.cc/150?img=21" },
+  { id: 112, name: "Hassan Raza", avatar: "https://i.pravatar.cc/150?img=22" },
+  { id: 113, name: "Imran Khan", avatar: "https://i.pravatar.cc/150?img=23" },
+  { id: 114, name: "Iqbal Ahmed", avatar: "https://i.pravatar.cc/150?img=24" },
+  { id: 115, name: "Junaid Akhtar", avatar: "https://i.pravatar.cc/150?img=25" },
+  { id: 116, name: "Javed Iqbal", avatar: "https://i.pravatar.cc/150?img=26" },
+  { id: 117, name: "Kamran Butt", avatar: "https://i.pravatar.cc/150?img=27" },
+  { id: 118, name: "Kashif Ali", avatar: "https://i.pravatar.cc/150?img=28" },
+  { id: 119, name: "Laiba Noor", avatar: "https://i.pravatar.cc/150?img=29" },
+  { id: 120, name: "Lubna Khan", avatar: "https://i.pravatar.cc/150?img=30" },
+  { id: 121, name: "Muhammad Ali", avatar: "https://i.pravatar.cc/150?img=31" },
+  { id: 122, name: "Mushtaq Ahmed", avatar: "https://i.pravatar.cc/150?img=32" },
+  { id: 123, name: "Nadia Shah", avatar: "https://i.pravatar.cc/150?img=33" },
+  { id: 124, name: "Naveed Iqbal", avatar: "https://i.pravatar.cc/150?img=34" },
+  { id: 125, name: "Omar Farooq", avatar: "https://i.pravatar.cc/150?img=35" },
+  { id: 126, name: "Osman Ali", avatar: "https://i.pravatar.cc/150?img=36" },
+  { id: 127, name: "Palwasha Khan", avatar: "https://i.pravatar.cc/150?img=37" },
+  { id: 128, name: "Parvez Ahmed", avatar: "https://i.pravatar.cc/150?img=38" },
+  { id: 129, name: "Qasim Ali", avatar: "https://i.pravatar.cc/150?img=39" },
+  { id: 130, name: "Qurat ul Ain", avatar: "https://i.pravatar.cc/150?img=40" },
+  { id: 131, name: "Rashid Minhas", avatar: "https://i.pravatar.cc/150?img=41" },
+  { id: 132, name: "Rukhsar Noor", avatar: "https://i.pravatar.cc/150?img=42" },
+  { id: 133, name: "Sara Ahmed", avatar: "https://i.pravatar.cc/150?img=43" },
+  { id: 134, name: "Sadia Ali", avatar: "https://i.pravatar.cc/150?img=44" },
+  { id: 135, name: "Tahir Mahmood", avatar: "https://i.pravatar.cc/150?img=45" },
+  { id: 136, name: "Tayyaba Noor", avatar: "https://i.pravatar.cc/150?img=46" },
+  { id: 137, name: "Usman Raza", avatar: "https://i.pravatar.cc/150?img=47" },
+  { id: 138, name: "Uzma Khan", avatar: "https://i.pravatar.cc/150?img=48" },
+  { id: 139, name: "Vickey Khan", avatar: "https://i.pravatar.cc/150?img=49" },
+  { id: 140, name: "Waqas Ahmed", avatar: "https://i.pravatar.cc/150?img=50" },
+  { id: 141, name: "Waseem Akram", avatar: "https://i.pravatar.cc/150?img=51" },
+  { id: 142, name: "Xavier John", avatar: "https://i.pravatar.cc/150?img=52" },
+  { id: 143, name: "Yasir Arafat", avatar: "https://i.pravatar.cc/150?img=53" },
+  { id: 144, name: "Yasmeen Noor", avatar: "https://i.pravatar.cc/150?img=54" },
+  { id: 145, name: "Zainab Malik", avatar: "https://i.pravatar.cc/150?img=55" },
+  { id: 146, name: "Zubair Ahmed", avatar: "https://i.pravatar.cc/150?img=56" }
+];
+
 const popularEmojis = [
   '😀', '😂', '😍', '🥰', '😎', '🤩', '😜', '🤗', '👍', '👏',
   '❤', '🔥', '💯', '✨', '🎉', '🙏', '😊', '😘', '😉', '🤔','🌸','💞','🥲','✅',
@@ -281,7 +337,14 @@ export default function ChatsPage() {
     stories: [...initialStoriesData],
     showMutedStories: false,
     chats: JSON.parse(JSON.stringify(initialChatsData)),
-    messageRequests: [],
+    messageRequests: [
+      { id: 201, name: "Zainab Malik", avatar: "https://i.pravatar.cc/150?img=16", time: "2h", message: "Hi, I'd like to connect with you!" },
+      { id: 202, name: "Ahmed Raza", avatar: "https://i.pravatar.cc/150?img=17", time: "5h", message: "Hello, can we talk?" }
+    ],
+    pendingRequests: [
+      { id: 301, name: "Ayesha Khan", avatar: "https://i.pravatar.cc/150?img=18", time: "1d", status: "Pending" },
+      { id: 302, name: "Omar Farooq", avatar: "https://i.pravatar.cc/150?img=19", time: "3d", status: "Pending" }
+    ],
     archivedChats: [
       {
         id: 6,
@@ -309,7 +372,12 @@ export default function ChatsPage() {
     callTimerInterval: null,
     recordingInterval: null,
     isMobile: typeof window !== 'undefined' ? window.innerWidth <= 768 : false,
-    isTablet: typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false
+    isTablet: typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false,
+    requestsActiveTab: 'requests',
+    showSendRequestModal: false,
+    requestMessage: '',
+    selectedUserForRequest: null,
+    dummyUsers: dummyUsers
   });
 
   const [profileAvatar, setProfileAvatar] = useState('https://i.pravatar.cc/150?img=32');
@@ -1169,6 +1237,7 @@ export default function ChatsPage() {
     }));
   };
 
+  // Enhanced search functionality - Only show names starting with the search letter
   const handleSearch = (query: string) => {
     setState(prev => ({
       ...prev,
@@ -1197,10 +1266,12 @@ export default function ChatsPage() {
         notification.description.toLowerCase().includes(lowerQuery)
       );
     } else if (state.activeSection === 'requests') {
-      results = state.messageRequests.filter((request: any) => 
-        request.name.toLowerCase().includes(lowerQuery) || 
-        request.lastMessage.toLowerCase().includes(lowerQuery)
-      );
+      // EXACT MATCH: Only show names starting with the search letter
+      results = state.dummyUsers.filter(user => {
+        const userName = user.name.toLowerCase();
+        // Check if name starts with the search query
+        return userName.startsWith(lowerQuery);
+      });
     } else if (state.activeSection === 'archived') {
       results = state.archivedChats.filter((chat: any) => 
         chat.name.toLowerCase().includes(lowerQuery) || 
@@ -1483,6 +1554,111 @@ export default function ChatsPage() {
     e.target.value = '';
   };
 
+  // New functions for message requests
+  const setRequestsActiveTab = (tab: string) => {
+    setState(prev => ({
+      ...prev,
+      requestsActiveTab: tab,
+      searchQuery: '',
+      searchResults: []
+    }));
+  };
+
+  const acceptRequest = (requestId: number) => {
+    const request = state.messageRequests.find(req => req.id === requestId);
+    if (request) {
+      // Create new chat with the accepted request
+      const newChat: Chat = {
+        id: Date.now(), // Generate unique ID
+        name: request.name,
+        avatar: request.avatar,
+        lastMessage: request.message || "You are now connected",
+        time: 'Just now',
+        unread: 0,
+        isOnline: true,
+        isActive: true,
+        messages: [
+          { 
+            id: 1, 
+            text: request.message || "Hi! Thanks for accepting my request.", 
+            time: request.time, 
+            isUser: false, 
+            type: 'text' 
+          },
+          {
+            id: 2,
+            text: "You are now connected on Messenger",
+            time: "Now",
+            isUser: false,
+            type: 'notification'
+          }
+        ]
+      };
+      
+      // Remove from requests and add to chats
+      setState(prev => ({
+        ...prev,
+        messageRequests: prev.messageRequests.filter(req => req.id !== requestId),
+        chats: [newChat, ...prev.chats], // Add to top of chats
+        activeChat: newChat, // Automatically open the new chat
+        messages: newChat.messages
+      }));
+    }
+  };
+
+  const rejectRequest = (requestId: number) => {
+    setState(prev => ({
+      ...prev,
+      messageRequests: prev.messageRequests.filter(req => req.id !== requestId)
+    }));
+  };
+
+  const removePendingRequest = (requestId: number) => {
+    setState(prev => ({
+      ...prev,
+      pendingRequests: prev.pendingRequests.filter(req => req.id !== requestId)
+    }));
+  };
+
+  const openSendRequestModal = (user: any) => {
+    setState(prev => ({
+      ...prev,
+      showSendRequestModal: true,
+      selectedUserForRequest: user,
+      requestMessage: ''
+    }));
+  };
+
+  const closeSendRequestModal = () => {
+    setState(prev => ({
+      ...prev,
+      showSendRequestModal: false,
+      selectedUserForRequest: null,
+      requestMessage: ''
+    }));
+  };
+
+  const sendFriendRequest = () => {
+    if (!state.requestMessage.trim()) return;
+    
+    const newPendingRequest = {
+      id: Date.now(),
+      name: state.selectedUserForRequest.name,
+      avatar: state.selectedUserForRequest.avatar,
+      time: 'Just now',
+      status: 'Pending',
+      message: state.requestMessage
+    };
+    
+    setState(prev => ({
+      ...prev,
+      pendingRequests: [newPendingRequest, ...prev.pendingRequests],
+      showSendRequestModal: false,
+      selectedUserForRequest: null,
+      requestMessage: ''
+    }));
+  };
+
   // Render functions
   const renderMessage = (message: Message) => {
     if (message.type === 'notification') {
@@ -1699,6 +1875,143 @@ export default function ChatsPage() {
   const currentMediaUrl = currentStory?.mediaUrls[state.currentStoryItemIndex];
   const isVideo = currentMediaUrl?.includes('video') || currentStory?.mediaType === 'video';
 
+  // Render Requests Tabs
+  const renderRequestsTabs = () => {
+    return (
+      <div className="requests-tabs">
+        <div className="tabs-header">
+          <button 
+            className={`tab-button ${state.requestsActiveTab === 'requests' ? 'active' : ''}`}
+            onClick={() => setRequestsActiveTab('requests')}
+          >
+            Requests
+          </button>
+          <button 
+            className={`tab-button ${state.requestsActiveTab === 'pending' ? 'active' : ''}`}
+            onClick={() => setRequestsActiveTab('pending')}
+          >
+            Pending
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Requests Content
+  const renderRequestsContent = () => {
+    if (state.requestsActiveTab === 'requests') {
+      return (
+        <div className="requests-list">
+          {state.messageRequests.length > 0 ? (
+            state.messageRequests.map(request => (
+              <div key={request.id} className="request-item">
+                <div className="request-avatar">
+                  <img src={request.avatar} alt={request.name} />
+                </div>
+                <div className="request-content">
+                  <div className="request-header">
+                    <span className="request-name">{request.name}</span>
+                    <span className="request-time">{request.time}</span>
+                  </div>
+                  <div className="request-message">
+                    {request.message}
+                  </div>
+                  <div className="request-actions">
+                    <button className="reject-btn" onClick={() => rejectRequest(request.id)}>
+                      Reject
+                    </button>
+                    <button className="accept-btn" onClick={() => acceptRequest(request.id)}>
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="no-requests">
+              <div className="no-requests-content">
+                <h3>No message requests</h3>
+                <p>New messages requests will appear here. You can control who can send you message requests.</p>
+                <button className="see-who-can-message">See who can message you</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div className="pending-list">
+          {state.pendingRequests.length > 0 ? (
+            state.pendingRequests.map(request => (
+              <div key={request.id} className="pending-item">
+                <div className="pending-avatar">
+                  <img src={request.avatar} alt={request.name} />
+                </div>
+                <div className="pending-content">
+                  <div className="pending-header">
+                    <span className="pending-name">{request.name}</span>
+                    <span className="pending-time">{request.time}</span>
+                  </div>
+                  <div className="pending-status">
+                    {request.status}
+                  </div>
+                  <div className="pending-actions">
+                    <button className="remove-btn" onClick={() => removePendingRequest(request.id)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="no-pending">
+              <div className="no-pending-content">
+                <h3>No pending requests</h3>
+                <p>You haven't sent any friend requests yet.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
+
+  // Render Search Results for Requests
+  const renderSearchResults = () => {
+    if (!state.searchQuery.trim()) return null;
+
+    return (
+      <div className="search-results">
+        {state.searchResults.length > 0 ? 
+          state.searchResults.map(user => (
+            <div key={user.id} className="search-result-item">
+              <div className="chat-item">
+                <div className="chat-avatar">
+                  <img src={user.avatar} alt={user.name} />
+                </div>
+                <div className="chat-content">
+                  <div className="chat-header">
+                    <span className="chat-name">{user.name}</span>
+                  </div>
+                  <div className="chat-preview">
+                    <span>Click to send friend request</span>
+                  </div>
+                </div>
+                <button 
+                  className="send-request-btn"
+                  onClick={() => openSendRequestModal(user)}
+                >
+                  Send Request
+                </button>
+              </div>
+            </div>
+          )) :
+          <div className="no-results">No users found starting with "{state.searchQuery}"</div>
+        }
+      </div>
+    );
+  };
+
   return (
     <div className="messenger-container">
       {/* Mobile Header */}
@@ -1812,30 +2125,7 @@ export default function ChatsPage() {
           {/* Section Content */}
           <div className="section-content">
             {state.searchQuery ? (
-              <div className="search-results">
-                {state.searchResults.length > 0 ? 
-                  state.searchResults.map(result => (
-                    <div key={result.id} className="search-result-item" onClick={() => handleChatClick(result.id)}>
-                      <div className="chat-item">
-                        <div className="chat-avatar">
-                          <img src={result.avatar} alt={result.name} />
-                          {result.isOnline && <div className="online-indicator"></div>}
-                        </div>
-                        <div className="chat-content">
-                          <div className="chat-header">
-                            <span className="chat-name">{result.name}</span>
-                            <span className="chat-time">{result.time}</span>
-                          </div>
-                          <div className="chat-preview">
-                            <span>{result.lastMessage || 'No messages yet'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )) :
-                  <div className="no-results">No results found for "{state.searchQuery}"</div>
-                }
-              </div>
+              renderSearchResults()
             ) : (
               <>
                 {/* Stories Section */}
@@ -1929,15 +2219,8 @@ export default function ChatsPage() {
                 {/* Requests Section */}
                 {state.activeSection === 'requests' && (
                   <div className="requests-section">
-                    <div className="requests-list">
-                      <div className="no-requests">
-                        <div className="no-requests-content">
-                          <h3>No message requests</h3>
-                          <p>New messages requests will appear here. You can control who can send you message requests.</p>
-                          <button className="see-who-can-message">See who can message you</button>
-                        </div>
-                      </div>
-                    </div>
+                    {renderRequestsTabs()}
+                    {renderRequestsContent()}
                   </div>
                 )}
 
@@ -2157,6 +2440,42 @@ export default function ChatsPage() {
           </div>
         </div>
       </div>
+
+      {/* Send Request Modal */}
+      {state.showSendRequestModal && (
+        <div className="modal-overlay">
+          <div className="send-request-modal">
+            <div className="modal-header">
+              <div className="modal-user-info">
+                <div className="sender-avatar">
+                  <img src={profileAvatar} alt="You" />
+                </div>
+                <div className="friendship-icon">
+                  <i className="fas fa-handshake"></i>
+                </div>
+                <div className="receiver-avatar">
+                  <img src={state.selectedUserForRequest?.avatar} alt={state.selectedUserForRequest?.name} />
+                </div>
+              </div>
+              <button className="close-modal" onClick={closeSendRequestModal}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="request-chat-box">
+                <textarea 
+                  placeholder="Type a message to send with your friend request..."
+                  value={state.requestMessage}
+                  onChange={(e) => setState(prev => ({ ...prev, requestMessage: e.target.value }))}
+                />
+              </div>
+              <button className="send-request-button" onClick={sendFriendRequest}>
+                Send Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stories Viewer */}
       {state.showStoriesViewer && currentStory && currentStory.mediaUrls.length > 0 && (
