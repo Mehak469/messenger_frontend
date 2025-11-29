@@ -1,4 +1,20 @@
-export default function Home() {
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Logo from "../components/logo";
+import Footer from "../components/footer";
+
+export default function Splash() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      router.push("/auth"); // Redirect to auth page
+    }, 3000); // 3 seconds
+    return () => clearTimeout(timer);
+  }, [router]);
+
   return (
     <div style={{
       display: 'flex',
@@ -9,50 +25,8 @@ export default function Home() {
       backgroundColor: 'white',
       padding: '20px'
     }}>
-      {/* Center Logo */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <img
-          src="/messenger_logo.jpg"
-          alt="Messenger Logo"
-          style={{
-            width: '80px',
-            height: '80px',
-            objectFit: 'contain'
-          }}
-        />
-      </div>
-
-      {/* Bottom From Meta - Placed at very bottom */}
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '0px'
-      }}>
-        <p style={{
-          color: '#9CA3AF',
-          fontSize: '14px',
-          marginBottom: '0px'
-        }}>from</p>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <img
-            src="/meta-logo.jpg"
-            alt="Meta Logo"
-            style={{
-              width: '70px',
-              height: '70px',
-              objectFit: 'contain'
-            }}
-          />
-        </div>
-      </div>
+      <Logo />
+      <Footer />
     </div>
   );
 }

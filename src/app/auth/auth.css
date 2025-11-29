@@ -137,3 +137,101 @@
 .error-message.success {
   color: #00ba7c;
 }
+/* Add these to your existing auth.css */
+.forgot-password-link {
+  color: #007bff;
+  text-decoration: none;
+  font-size: 14px;
+  margin-top: 10px;
+  display: block;
+  text-align: center;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
+}
+
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #c3e6cb;
+}
+
+.auth-link {
+  color: #007bff;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 14px;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* Token Section Styles */
+.token-section {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.token-info {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.token-info code {
+  background: #2d3748;
+  color: #68d391;
+  padding: 8px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+/* Success and Error Messages */
+.success-message {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #c3e6cb;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #f5c6cb;
+}
+
+.auth-link {
+  color: #007bff;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 14px;
+  display: inline-block;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
