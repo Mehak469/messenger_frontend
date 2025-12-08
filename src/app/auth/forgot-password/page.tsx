@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import '../auth.css';
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const URL="http://127.0.0.1:8000/api/v1"
+
 
 interface ForgotPasswordState {
   email: string;
@@ -19,7 +22,6 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [resetToken, setResetToken] = useState('');
 
-  const API_BASE_URL = "https://messanger-semester-project.vercel.app/api/v1"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +37,8 @@ export default function ForgotPasswordPage() {
     setResetToken('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/forgot-password`, {
+      // const response = await fetch(`${API_BASE_URL}/users/forgot-password`
+      const response = await fetch(`${URL}/users/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './chats.css'
 
-// Types
+// Types (وہی رہیں گے)
 interface Chat {
   id: number;
   name: string;
@@ -11,7 +11,7 @@ interface Chat {
   time: string;
   unread: number;
   isOnline: boolean;
-  isActive: boolean;
+  isActive?: boolean;
   messages: Message[];
 }
 
@@ -24,6 +24,7 @@ interface Message {
   content?: string;
   voiceUrl?: string;
   duration?: number;
+  mediaType?: string;
 }
 
 interface Story {
@@ -117,18 +118,31 @@ interface AppState {
   requestsActiveTab: string;
   showSendRequestModal: boolean;
   requestMessage: string;
-  selectedUserForRequest: any;
+  selectedUserForRequest: null;
   dummyUsers: any[];
+  showChatContextMenu: boolean;
+  showStoryOptionsMenu: boolean;
+  longPressTimer: any;
 }
 
-// Initial data
+// Initial data - REMOVED Irfan Shameer from chats
 const initialChatsData: Chat[] = [
   {
     id: 1,
+    name: "Elliz Ladla",
+    avatar: "https://i.pravatar.cc/150?img=3",
+    lastMessage: "That's interesting!",
+    time: "16:07",
+    unread: 0,
+    isOnline: true,
+    messages: []
+  },
+  {
+    id: 2,
     name: "Noor",
     avatar: "https://i.pravatar.cc/150?img=1",
-    lastMessage: "You changed the theme to Classic",
-    time: "2d",
+    lastMessage: "Nice!",
+    time: "16:06",
     unread: 0,
     isOnline: true,
     isActive: true,
@@ -140,8 +154,8 @@ const initialChatsData: Chat[] = [
     ]
   },
   {
-    id: 2,
-    name: "Buddy😊😊😊",
+    id: 3,
+    name: "Buddy",
     avatar: "https://i.pravatar.cc/150?img=2",
     lastMessage: "You sent an attachment",
     time: "1w",
@@ -150,33 +164,13 @@ const initialChatsData: Chat[] = [
     messages: []
   },
   {
-    id: 3,
-    name: "Elliz Ladla",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    lastMessage: "You changed the theme to Graph Paper",
-    time: "3w",
-    unread: 0,
-    isOnline: true,
-    messages: []
-  },
-  {
     id: 4,
     name: "Hassan Raza",
     avatar: "https://i.pravatar.cc/150?img=4",
-    lastMessage: "Messages and calls are secured with end-to-en...",
+    lastMessage: "Messages and calls are secured with end-to-end...",
     time: "5w",
     unread: 0,
     isOnline: false,
-    messages: []
-  },
-  {
-    id: 5,
-    name: "Muhammad Irfan Shameer",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    lastMessage: "Reacted 😊 to your message",
-    time: "5w",
-    unread: 0,
-    isOnline: true,
     messages: []
   }
 ];
@@ -346,13 +340,7 @@ export default function ChatsPage() {
       { id: 302, name: "Omar Farooq", avatar: "https://i.pravatar.cc/150?img=19", time: "3d", status: "Pending" }
     ],
     archivedChats: [
-      {
-        id: 6,
-        name: 'Haider Ali Mughal',
-        avatar: 'https://i.pravatar.cc/150?img=6',
-        lastMessage: 'Messages and calls are secured with end-t...',
-        time: '36w'
-      }
+      // Haider Mughal ki chat yahan say remove kar di gayi hai
     ],
     notifications: [...initialNotificationsData],
     activeChat: null,
@@ -371,13 +359,16 @@ export default function ChatsPage() {
     storyProgressInterval: null,
     callTimerInterval: null,
     recordingInterval: null,
-    isMobile: typeof window !== 'undefined' ? window.innerWidth <= 768 : false,
-    isTablet: typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false,
+    isMobile: false,
+    isTablet: false,
     requestsActiveTab: 'requests',
     showSendRequestModal: false,
     requestMessage: '',
     selectedUserForRequest: null,
-    dummyUsers: dummyUsers
+    dummyUsers: dummyUsers,
+    showChatContextMenu: false,
+    showStoryOptionsMenu: false,
+    longPressTimer: null
   });
 
   const [profileAvatar, setProfileAvatar] = useState('https://i.pravatar.cc/150?img=32');
@@ -394,17 +385,20 @@ export default function ChatsPage() {
     isMyStory: true
   });
 
+  const [isClient, setIsClient] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const touchStartRef = useRef<number>(0);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('messengerUser');
+    setIsClient(true);
+    
+    const userData = localStorage.getItem('user');
     if (!userData) {
       window.location.href = '/auth';
       return;
     }
 
-    // Load user profile data
     const parsedUserData = JSON.parse(userData);
     if (parsedUserData.avatar) {
       setProfileAvatar(parsedUserData.avatar);
@@ -414,12 +408,6 @@ export default function ChatsPage() {
       }));
     }
 
-    // Auto simulate incoming call after 3 seconds
-    const callTimer = setTimeout(() => {
-      simulateIncomingCall(initialChatsData[0]);
-    }, 3000);
-
-    // Window resize handler
     const handleResize = () => {
       setState(prev => ({
         ...prev,
@@ -428,11 +416,14 @@ export default function ChatsPage() {
       }));
     };
 
+    handleResize();
     window.addEventListener('resize', handleResize);
 
     return () => {
-      clearTimeout(callTimer);
       window.removeEventListener('resize', handleResize);
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
     };
   }, []);
 
@@ -534,13 +525,30 @@ export default function ChatsPage() {
     }));
   };
 
+  // ===== FIXED: Handle Chat Click for Both Active and Archived Chats =====
   const handleChatClick = (chatId: number) => {
-    const chat = state.chats.find(c => c.id === chatId);
+    // First search in active chats
+    let chat = state.chats.find(c => c.id === chatId);
+    
+    // If not found in active chats, search in archived chats
+    if (!chat) {
+      const archivedChat = state.archivedChats.find(c => c.id === chatId);
+      if (archivedChat) {
+        // Convert archived chat to full Chat object with messages
+        chat = {
+          ...archivedChat,
+          unread: archivedChat.unread || 0,
+          isOnline: archivedChat.isOnline || false,
+          messages: archivedChat.messages || []
+        };
+      }
+    }
+    
     if (chat) {
       setState(prev => ({
         ...prev,
         activeChat: chat,
-        messages: chat.messages
+        messages: chat.messages || []
       }));
     }
   };
@@ -565,10 +573,8 @@ export default function ChatsPage() {
       newMessage: ''
     }));
     
-    // Update chats state with new message and REORDER CHAT TO TOP
     reorderChats(state.activeChat!.id, state.newMessage, currentTime);
     
-    // Simulate reply after 1 second
     setTimeout(() => {
       const replyText = getRandomReply();
       const replyTime = getCurrentTime();
@@ -585,7 +591,6 @@ export default function ChatsPage() {
         messages: [...updatedMessages, replyMsg]
       }));
       
-      // Reorder chat again for the reply
       reorderChats(state.activeChat!.id, replyText, replyTime);
     }, 1000);
   };
@@ -610,45 +615,40 @@ export default function ChatsPage() {
   };
 
   const reorderChats = (chatId: number, lastMessage: string, time: string) => {
+    // Update in active chats
     const chatIndex = state.chats.findIndex(chat => chat.id === chatId);
-    if (chatIndex === -1) return;
+    if (chatIndex !== -1) {
+      const updatedChats = [...state.chats];
+      const chatToMove = { ...updatedChats[chatIndex] };
+      
+      chatToMove.lastMessage = lastMessage;
+      chatToMove.time = time;
+      
+      updatedChats.splice(chatIndex, 1);
+      updatedChats.unshift(chatToMove);
+      
+      setState(prev => ({
+        ...prev,
+        chats: updatedChats
+      }));
+    }
     
-    const updatedChats = [...state.chats];
-    const chatToMove = { ...updatedChats[chatIndex] };
-    
-    // Update chat with new message info
-    chatToMove.lastMessage = lastMessage;
-    chatToMove.time = time;
-    
-    // Remove from current position
-    updatedChats.splice(chatIndex, 1);
-    
-    // Add to top
-    updatedChats.unshift(chatToMove);
-    
-    setState(prev => ({
-      ...prev,
-      chats: updatedChats
-    }));
-  };
-
-  const simulateIncomingCall = (contact: Chat) => {
-    setState(prev => ({
-      ...prev,
-      callState: {
-        ...prev.callState,
-        isIncomingCall: true,
-        isOutgoingCall: false,
-        isCallActive: false,
-        isCallEnded: false,
-        callDuration: 0,
-        isMuted: false,
-        isSpeakerOn: false,
-        totalCallTime: 0,
-        callType: 'incoming',
-        callRecipient: contact
-      }
-    }));
+    // Also update in archived chats if the chat is archived
+    const archivedIndex = state.archivedChats.findIndex(chat => chat.id === chatId);
+    if (archivedIndex !== -1) {
+      const updatedArchivedChats = [...state.archivedChats];
+      const archivedChatToUpdate = { ...updatedArchivedChats[archivedIndex] };
+      
+      archivedChatToUpdate.lastMessage = lastMessage;
+      archivedChatToUpdate.time = time;
+      
+      setState(prev => ({
+        ...prev,
+        archivedChats: updatedArchivedChats.map(chat => 
+          chat.id === chatId ? archivedChatToUpdate : chat
+        )
+      }));
+    }
   };
 
   const startOutgoingCall = (contact: Chat) => {
@@ -669,7 +669,6 @@ export default function ChatsPage() {
       }
     }));
     
-    // Simulate call being answered after 3 seconds
     setTimeout(() => {
       setState(prev => ({
         ...prev,
@@ -680,19 +679,6 @@ export default function ChatsPage() {
         }
       }));
     }, 3000);
-  };
-
-  const answerCall = () => {
-    setState(prev => ({
-      ...prev,
-      callState: {
-        ...prev.callState,
-        isIncomingCall: false,
-        isCallActive: true,
-        isCallEnded: false,
-        callDuration: 0
-      }
-    }));
   };
 
   const endCall = () => {
@@ -723,25 +709,6 @@ export default function ChatsPage() {
         }
       }));
     }, 2000);
-  };
-
-  const declineCall = () => {
-    setState(prev => ({
-      ...prev,
-      callState: {
-        ...prev.callState,
-        isIncomingCall: false,
-        isOutgoingCall: false,
-        isCallActive: false,
-        isCallEnded: false,
-        callDuration: 0,
-        isMuted: false,
-        isSpeakerOn: false,
-        totalCallTime: 0,
-        callType: null,
-        callRecipient: null
-      }
-    }));
   };
 
   const cancelOutgoingCall = () => {
@@ -804,12 +771,10 @@ export default function ChatsPage() {
     let storyIndex = -1;
     let currentStories = [...state.stories];
     
-    // Check if it's "Your Story"
     if (storyId === yourStory.id) {
-      // For "Your Story", we'll handle it separately
       setState(prev => ({
         ...prev,
-        currentStoryIndex: -1, // -1 indicates "Your Story"
+        currentStoryIndex: -1,
         currentStoryItemIndex: itemIndex,
         showStoriesViewer: true,
         isStoryPlaying: true,
@@ -819,7 +784,6 @@ export default function ChatsPage() {
       return;
     }
     
-    // Find the story in regular stories
     storyIndex = currentStories.findIndex(story => story.id === storyId);
     if (storyIndex === -1) return;
     
@@ -887,7 +851,6 @@ export default function ChatsPage() {
     const isYourStory = state.currentStoryIndex === -1;
     
     if (isYourStory) {
-      // If it's "Your Story" and we're at the end, close the viewer
       closeStory();
       return;
     }
@@ -911,7 +874,6 @@ export default function ChatsPage() {
     const isYourStory = state.currentStoryIndex === -1;
     
     if (isYourStory) {
-      // If it's "Your Story", we can't go to previous story
       return;
     }
     
@@ -925,14 +887,81 @@ export default function ChatsPage() {
     }
   };
 
+  // Mobile Touch Handlers
+  const handleChatTouchStart = (chatId: number, type: string = 'chat', e: React.TouchEvent) => {
+    touchStartRef.current = e.touches[0].clientX;
+    
+    longPressTimerRef.current = setTimeout(() => {
+      const touch = e.touches[0];
+      showChatContextMenu(chatId, type, touch.clientX, touch.clientY);
+    }, 500); // 500ms for long press
+  };
+
+  const handleChatTouchEnd = (e: React.TouchEvent) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+    
+    // Check if it was a swipe (for mobile)
+    const touchEnd = e.changedTouches[0].clientX;
+    if (Math.abs(touchEnd - touchStartRef.current) < 10) {
+      // It's a tap, handle normal click
+      const target = e.target as HTMLElement;
+      const chatItem = target.closest('.mobile-chat-item, .chat-item, .archived-item');
+      if (chatItem && !state.contextMenu.visible) {
+        const chatId = parseInt(chatItem.getAttribute('data-chat-id') || '0');
+        if (chatId) handleChatClick(chatId);
+      }
+    }
+  };
+
+  const handleStoryTouchStart = (storyId: number, e: React.TouchEvent) => {
+    longPressTimerRef.current = setTimeout(() => {
+      const touch = e.touches[0];
+      showStoryContextMenu(storyId, touch.clientX, touch.clientY);
+    }, 500); // 500ms for long press
+  };
+
+  const handleStoryTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  };
+
+  const showChatContextMenu = (chatId: number, type: string, x: number, y: number) => {
+    setState(prev => ({
+      ...prev,
+      contextMenu: {
+        visible: true,
+        x: x,
+        y: y,
+        chatId: chatId,
+        type: type
+      }
+    }));
+  };
+
+  const showStoryContextMenu = (storyId: number, x: number, y: number) => {
+    const story = state.stories.find(s => s.id === storyId) || (storyId === yourStory.id ? yourStory : null);
+    if (story) {
+      setState(prev => ({
+        ...prev,
+        storyContextMenu: {
+          visible: true,
+          x: x,
+          y: y,
+          storyId: storyId,
+          isMutedStory: !!story.isMuted
+        }
+      }));
+    }
+  };
+
   const handleStoryRightClick = (e: React.MouseEvent, storyId: number) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Don't show context menu for "Your Story"
-    if (storyId === yourStory.id) return;
-    
-    const story = state.stories.find(s => s.id === storyId);
+    const story = state.stories.find(s => s.id === storyId) || (storyId === yourStory.id ? yourStory : null);
     if (story) {
       setState(prev => ({
         ...prev,
@@ -948,6 +977,8 @@ export default function ChatsPage() {
   };
 
   const muteStory = (storyId: number) => {
+    if (storyId === yourStory.id) return;
+    
     setState(prev => ({
       ...prev,
       stories: prev.stories.map(story => 
@@ -958,6 +989,8 @@ export default function ChatsPage() {
   };
 
   const unmuteStory = (storyId: number) => {
+    if (storyId === yourStory.id) return;
+    
     setState(prev => ({
       ...prev,
       stories: prev.stories.map(story => 
@@ -968,9 +1001,7 @@ export default function ChatsPage() {
   };
 
   const deleteStory = (storyId: number) => {
-    // Only allow deleting "Your Story"
     if (storyId === yourStory.id) {
-      // Reset your story
       setYourStory(prev => ({
         ...prev,
         mediaUrls: [],
@@ -979,10 +1010,14 @@ export default function ChatsPage() {
         hasNewStory: false
       }));
       
-      // If current story is being deleted, close viewer
       if (state.showStoriesViewer && state.currentStoryIndex === -1) {
         closeStory();
       }
+    } else {
+      setState(prev => ({
+        ...prev,
+        stories: prev.stories.filter(story => story.id !== storyId)
+      }));
     }
     setState(prev => ({
       ...prev,
@@ -1009,9 +1044,7 @@ export default function ChatsPage() {
           newMediaUrls.push(mediaUrl);
           newCaptions.push(`My story ${index + 1} 📸`);
           
-          // When all files are processed
           if (newMediaUrls.length === files.length) {
-            // Update "Your Story" with new media - ADD TO EXISTING STORIES
             setYourStory(prev => ({
               ...prev,
               mediaUrls: [...prev.mediaUrls, ...newMediaUrls],
@@ -1021,10 +1054,9 @@ export default function ChatsPage() {
               hasNewStory: true
             }));
             
-            // Auto open the updated story
             setState(prev => ({
               ...prev,
-              currentStoryIndex: -1, // -1 indicates "Your Story"
+              currentStoryIndex: -1,
               currentStoryItemIndex: prev.currentStoryIndex === -1 ? prev.currentStoryItemIndex : 0,
               showStoriesViewer: true
             }));
@@ -1047,13 +1079,12 @@ export default function ChatsPage() {
   const toggleStoryMessageBox = () => {
     const isYourStory = state.currentStoryIndex === -1;
     
-    // Don't show message box for "Your Story"
     if (isYourStory) return;
     
     setState(prev => ({ 
       ...prev, 
       showStoryMessageBox: !prev.showStoryMessageBox,
-      isStoryPlaying: !prev.showStoryMessageBox // Pause when opening message box, play when closing
+      isStoryPlaying: !prev.showStoryMessageBox
     }));
   };
 
@@ -1062,12 +1093,10 @@ export default function ChatsPage() {
     
     const isYourStory = state.currentStoryIndex === -1;
     
-    // Don't allow sending messages to "Your Story"
     if (isYourStory) return;
     
     const currentStory = state.stories[state.currentStoryIndex];
     if (!currentStory.isMyStory) {
-      // Find the chat for this story user
       const storyUserChat = state.chats.find(chat => 
         chat.name.toLowerCase().includes(currentStory.name.toLowerCase())
       );
@@ -1084,7 +1113,6 @@ export default function ChatsPage() {
         
         const updatedMessages = [...storyUserChat.messages, storyReplyMessage];
         
-        // Update both chats state and active chat if needed
         setState(prev => ({
           ...prev,
           chats: prev.chats.map(chat => 
@@ -1097,10 +1125,8 @@ export default function ChatsPage() {
           )
         }));
         
-        // Reorder the chat to top
         reorderChats(storyUserChat.id, state.storyMessage, currentTime);
         
-        // If this chat is active, update messages
         if (state.activeChat?.id === storyUserChat.id) {
           setState(prev => ({
             ...prev,
@@ -1108,7 +1134,6 @@ export default function ChatsPage() {
           }));
         }
         
-        // Close story viewer and open chat interface
         closeStory();
         handleChatClick(storyUserChat.id);
       }
@@ -1153,13 +1178,15 @@ export default function ChatsPage() {
   const archiveChat = (id: number) => {
     const chatToArchive = state.chats.find(chat => chat.id === id);
     if (chatToArchive) {
-      // Move chat to archived
       const archivedChat = {
         id: chatToArchive.id,
         name: chatToArchive.name,
         avatar: chatToArchive.avatar,
         lastMessage: chatToArchive.lastMessage,
-        time: chatToArchive.time
+        time: chatToArchive.time,
+        unread: chatToArchive.unread,
+        isOnline: chatToArchive.isOnline,
+        messages: chatToArchive.messages
       };
       
       setState(prev => ({
@@ -1178,7 +1205,6 @@ export default function ChatsPage() {
   const unarchiveChat = (id: number) => {
     const chatToUnarchive = state.archivedChats.find(chat => chat.id === id);
     if (chatToUnarchive) {
-      // Move chat back to main list with original messages
       const originalChat = initialChatsData.find(chat => chat.id === id);
       const newChat: Chat = {
         id: chatToUnarchive.id,
@@ -1186,9 +1212,9 @@ export default function ChatsPage() {
         avatar: chatToUnarchive.avatar,
         lastMessage: chatToUnarchive.lastMessage,
         time: chatToUnarchive.time,
-        unread: 0,
-        isOnline: false,
-        messages: originalChat?.messages || []
+        unread: chatToUnarchive.unread || 0,
+        isOnline: chatToUnarchive.isOnline || false,
+        messages: chatToUnarchive.messages || originalChat?.messages || []
       };
       
       setState(prev => ({
@@ -1203,14 +1229,12 @@ export default function ChatsPage() {
   const handleDeleteFromContextMenu = () => {
     if (state.contextMenu.chatId) {
       if (state.contextMenu.type === 'archived') {
-        // Delete archived chat
         setState(prev => ({
           ...prev,
           archivedChats: prev.archivedChats.filter(chat => chat.id !== state.contextMenu.chatId),
           contextMenu: { ...prev.contextMenu, visible: false }
         }));
       } else {
-        // Delete regular chat
         deleteChat(state.contextMenu.chatId);
       }
     }
@@ -1237,7 +1261,7 @@ export default function ChatsPage() {
     }));
   };
 
-  // Enhanced search functionality - Only show names starting with the search letter
+  // ===== FIXED SEARCH FUNCTIONALITY =====
   const handleSearch = (query: string) => {
     setState(prev => ({
       ...prev,
@@ -1256,9 +1280,9 @@ export default function ChatsPage() {
     let results: any[] = [];
     
     if (state.activeSection === 'chats') {
+      // FIXED: Show chats where name starts with search query (case insensitive)
       results = state.chats.filter(chat => 
-        chat.name.toLowerCase().includes(lowerQuery) || 
-        chat.lastMessage.toLowerCase().includes(lowerQuery)
+        chat.name.toLowerCase().startsWith(lowerQuery)
       );
     } else if (state.activeSection === 'notifications') {
       results = state.notifications.filter(notification => 
@@ -1266,11 +1290,11 @@ export default function ChatsPage() {
         notification.description.toLowerCase().includes(lowerQuery)
       );
     } else if (state.activeSection === 'requests') {
-      // EXACT MATCH: Only show names starting with the search letter
+      // FIXED: Show users whose names start with search query and are not already connected
+      const connectedUserNames = state.chats.map(chat => chat.name.toLowerCase());
       results = state.dummyUsers.filter(user => {
         const userName = user.name.toLowerCase();
-        // Check if name starts with the search query
-        return userName.startsWith(lowerQuery);
+        return userName.startsWith(lowerQuery) && !connectedUserNames.includes(userName);
       });
     } else if (state.activeSection === 'archived') {
       results = state.archivedChats.filter((chat: any) => 
@@ -1285,11 +1309,12 @@ export default function ChatsPage() {
     }));
   };
 
-  const sendLike = () => {
+  // ===== UPDATED: Thumb emoji send function =====
+  const sendThumbEmoji = () => {
     const currentTime = getCurrentTime();
     const likeMessage: Message = {
       id: state.messages.length + 1,
-      text: "❤",
+      text: "👍",
       time: currentTime,
       isUser: true,
       type: 'like'
@@ -1301,8 +1326,7 @@ export default function ChatsPage() {
       messages: updatedMessages
     }));
     
-    // Update chats state and reorder
-    reorderChats(state.activeChat!.id, "❤", currentTime);
+    reorderChats(state.activeChat!.id, "👍", currentTime);
   };
 
   const addEmoji = (emoji: string) => {
@@ -1343,7 +1367,6 @@ export default function ChatsPage() {
         const audioBlob = new Blob(chunks, { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        // Send voice message
         const currentTime = getCurrentTime();
         const voiceMessage: Message = {
           id: state.messages.length + 1,
@@ -1362,10 +1385,8 @@ export default function ChatsPage() {
           audioChunks: []
         }));
         
-        // Update chats state with new message and reorder
         reorderChats(state.activeChat!.id, "Voice message", currentTime);
         
-        // Clean up
         stream.getTracks().forEach(track => track.stop());
       };
       
@@ -1469,11 +1490,9 @@ export default function ChatsPage() {
           messages: updatedMessages
         }));
         
-        // Update chats state and reorder
         const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
         reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
         
-        // Simulate reply after 1.5 seconds
         setTimeout(() => {
           const replyText = "Nice! 👍";
           const replyTime = getCurrentTime();
@@ -1490,7 +1509,6 @@ export default function ChatsPage() {
             messages: [...updatedMessages, replyMsg]
           }));
           
-          // Reorder chat again for the reply
           reorderChats(state.activeChat!.id, replyText, replyTime);
         }, 1500);
       };
@@ -1523,11 +1541,9 @@ export default function ChatsPage() {
         messages: updatedMessages
       }));
       
-      // Update chats state and reorder
       const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
       reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
       
-      // Simulate reply after 1.5 seconds
       setTimeout(() => {
         const replyText = "Nice! 👍";
         const replyTime = getCurrentTime();
@@ -1544,7 +1560,6 @@ export default function ChatsPage() {
           messages: [...updatedMessages, replyMsg]
         }));
         
-        // Reorder chat again for the reply
         reorderChats(state.activeChat!.id, replyText, replyTime);
       }, 1500);
     };
@@ -1567,9 +1582,8 @@ export default function ChatsPage() {
   const acceptRequest = (requestId: number) => {
     const request = state.messageRequests.find(req => req.id === requestId);
     if (request) {
-      // Create new chat with the accepted request
       const newChat: Chat = {
-        id: Date.now(), // Generate unique ID
+        id: Date.now(),
         name: request.name,
         avatar: request.avatar,
         lastMessage: request.message || "You are now connected",
@@ -1595,12 +1609,11 @@ export default function ChatsPage() {
         ]
       };
       
-      // Remove from requests and add to chats
       setState(prev => ({
         ...prev,
         messageRequests: prev.messageRequests.filter(req => req.id !== requestId),
-        chats: [newChat, ...prev.chats], // Add to top of chats
-        activeChat: newChat, // Automatically open the new chat
+        chats: [newChat, ...prev.chats],
+        activeChat: newChat,
         messages: newChat.messages
       }));
     }
@@ -1659,7 +1672,15 @@ export default function ChatsPage() {
     }));
   };
 
-  // Render functions
+  // Check if user is already connected
+  const isUserConnected = (userName: string) => {
+    return state.chats.some(chat => 
+      chat.name.toLowerCase() === userName.toLowerCase()
+    );
+  };
+
+  // ===== FIXED RENDER FUNCTIONS =====
+
   const renderMessage = (message: Message) => {
     if (message.type === 'notification') {
       return (
@@ -1672,7 +1693,7 @@ export default function ChatsPage() {
       return (
         <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
           <div className="like-message">
-            <i className="fas fa-heart"></i>
+            <span className="thumb-emoji">👍</span>
             <span>Liked a message</span>
           </div>
         </div>
@@ -1778,22 +1799,12 @@ export default function ChatsPage() {
         {/* Your Story - Only show if user has stories */}
         {yourStory.storyCount > 0 && (
           <div 
+            key={yourStory.id}
             className={`story ${yourStory.isMyStory ? 'my-story' : ''} ${yourStory.isSeen ? 'seen-story' : ''}`}
             onClick={() => openStory(yourStory.id)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setState(prev => ({
-                ...prev,
-                storyContextMenu: {
-                  visible: true,
-                  x: e.clientX,
-                  y: e.clientY,
-                  storyId: yourStory.id,
-                  isMutedStory: false
-                }
-              }));
-            }}
+            onContextMenu={(e) => handleStoryRightClick(e, yourStory.id)}
+            onTouchStart={(e) => handleStoryTouchStart(yourStory.id, e)}
+            onTouchEnd={handleStoryTouchEnd}
           >
             <div className="story-avatar">
               <img src={yourStory.avatar} alt={yourStory.name} />
@@ -1816,6 +1827,8 @@ export default function ChatsPage() {
             className={`story ${story.isMyStory ? 'my-story' : ''} ${story.isSeen ? 'seen-story' : ''}`}
             onClick={() => openStory(story.id)}
             onContextMenu={(e) => handleStoryRightClick(e, story.id)}
+            onTouchStart={(e) => handleStoryTouchStart(story.id, e)}
+            onTouchEnd={handleStoryTouchEnd}
           >
             <div className="story-avatar">
               <img src={story.avatar} alt={story.name} />
@@ -1844,6 +1857,8 @@ export default function ChatsPage() {
               className="story muted-story"
               onClick={() => openStory(story.id)}
               onContextMenu={(e) => handleStoryRightClick(e, story.id)}
+              onTouchStart={(e) => handleStoryTouchStart(story.id, e)}
+              onTouchEnd={handleStoryTouchEnd}
             >
               <div className="story-avatar">
                 <img src={story.avatar} alt={story.name} />
@@ -1976,158 +1991,304 @@ export default function ChatsPage() {
     }
   };
 
-  // Render Search Results for Requests
+  // ===== FIXED: Render Search Results for Chats =====
   const renderSearchResults = () => {
     if (!state.searchQuery.trim()) return null;
 
     return (
       <div className="search-results">
         {state.searchResults.length > 0 ? 
-          state.searchResults.map(user => (
-            <div key={user.id} className="search-result-item">
-              <div className="chat-item">
-                <div className="chat-avatar">
-                  <img src={user.avatar} alt={user.name} />
-                </div>
-                <div className="chat-content">
-                  <div className="chat-header">
-                    <span className="chat-name">{user.name}</span>
-                  </div>
-                  <div className="chat-preview">
-                    <span>Click to send friend request</span>
-                  </div>
-                </div>
-                <button 
-                  className="send-request-btn"
-                  onClick={() => openSendRequestModal(user)}
+          state.searchResults.map((result, index) => {
+            // For chats section - show chat items exactly as they appear in main list
+            if (state.activeSection === 'chats') {
+              const chat = result as Chat;
+              return (
+                <div 
+                  key={chat.id}
+                  className={`search-result-item ${state.isMobile ? 'mobile-chat-item' : 'chat-item'}`}
+                  onClick={() => handleChatClick(chat.id)}
                 >
-                  Send Request
-                </button>
-              </div>
-            </div>
-          )) :
-          <div className="no-results">No users found starting with "{state.searchQuery}"</div>
+                  <div className={`${state.isMobile ? 'mobile-chat-avatar' : 'chat-avatar'}`}>
+                    <img src={chat.avatar} alt={chat.name} />
+                    {chat.isOnline && <div className={`${state.isMobile ? 'mobile-online-indicator' : 'online-indicator'}`}></div>}
+                  </div>
+                  <div className={`${state.isMobile ? 'mobile-chat-info' : 'chat-content'}`}>
+                    <div className={`${state.isMobile ? 'mobile-chat-header' : 'chat-header'}`}>
+                      <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>{chat.name}</span>
+                      <span className={`${state.isMobile ? 'mobile-chat-time' : 'chat-time'}`}>{chat.time}</span>
+                    </div>
+                    <div className={`${state.isMobile ? 'mobile-chat-preview' : 'chat-preview'}`}>
+                      <span className={`${state.isMobile ? 'mobile-last-message' : 'chat-preview-text'}`}>
+                        {chat.lastMessage}
+                      </span>
+                      {chat.unread > 0 && (
+                        <span className={`${state.isMobile ? 'mobile-unread-badge' : 'unread-badge'}`}>
+                          {chat.unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            
+            // For requests section - show users with "Send Request" button
+            else if (state.activeSection === 'requests') {
+              const user = result;
+              const isConnected = isUserConnected(user.name);
+              
+              return (
+                <div key={user.id} className="search-result-item">
+                  <div className={`chat-item ${state.isMobile ? 'mobile-chat-item' : ''}`}>
+                    <div className={`${state.isMobile ? 'mobile-chat-avatar' : 'chat-avatar'}`}>
+                      <img src={user.avatar} alt={user.name} />
+                    </div>
+                    <div className={`${state.isMobile ? 'mobile-chat-info' : 'chat-content'}`}>
+                      <div className={`${state.isMobile ? 'mobile-chat-header' : 'chat-header'}`}>
+                        <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>{user.name}</span>
+                      </div>
+                      <div className={`${state.isMobile ? 'mobile-chat-preview' : 'chat-preview'}`}>
+                        <span>
+                          {isConnected 
+                            ? "Already connected" 
+                            : "Click to send friend request"
+                          }
+                        </span>
+                      </div>
+                    </div>
+                    {!isConnected && (
+                      <button 
+                        className="send-request-btn"
+                        onClick={() => openSendRequestModal(user)}
+                      >
+                        Send Request
+                      </button>
+                    )}
+                    {isConnected && (
+                      <button 
+                        className="send-request-btn connected-btn"
+                        disabled
+                      >
+                        Connected
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            
+            // For other sections (notifications, archived)
+            else {
+              return (
+                <div key={index} className="search-result-item">
+                  <div className="chat-item">
+                    <div className="chat-content">
+                      <div className="chat-header">
+                        <span className="chat-name">{result.name || result.title}</span>
+                      </div>
+                      <div className="chat-preview">
+                        <span>{result.lastMessage || result.description}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+          }) :
+          <div className="no-results">No results found for "{state.searchQuery}"</div>
         }
       </div>
     );
   };
 
+  // Don't render anything until client-side to avoid hydration mismatch
+  if (!isClient) {
+    return <div className="messenger-container">Loading...</div>;
+  }
+
   return (
     <div className="messenger-container">
-      {/* Mobile Header */}
-      <div className="mobile-header">
-        <div className="mobile-header-content">
-          <div className="mobile-header-title">Messenger</div>
-          <div className="mobile-header-actions">
-            <i className="fas fa-edit"></i>
-            <i className="fas fa-user-circle" onClick={() => window.location.href = '/profile'}></i>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Chat Header */}
-      {state.activeChat && (
-        <div className="mobile-chat-header">
-          <div className="mobile-chat-header-content">
-            <button className="mobile-back-btn" onClick={() => setState(prev => ({ ...prev, activeChat: null }))}>
-              <i className="fas fa-arrow-left"></i>
-            </button>
-            <div className="mobile-chat-user">
-              <div className="mobile-chat-avatar">
-                <img src={state.activeChat.avatar} alt={state.activeChat.name} />
-              </div>
-              <div className="mobile-chat-info">
-                <span className="mobile-chat-name">{state.activeChat.name}</span>
-                <span className="mobile-chat-status">{state.activeChat.isOnline ? 'Online' : 'Offline'}</span>
+      {/* Mobile Layout */}
+      {state.isMobile && (
+        <div className="mobile-layout">
+          {/* Mobile Header - Only shown in main list view */}
+          {!state.activeChat && (
+            <div className="mobile-header">
+              <div className="mobile-header-content">
+                <div className="mobile-header-title">
+                  {state.activeSection === 'chats' ? 'Messenger' :
+                   state.activeSection === 'notifications' ? 'Notifications' :
+                   state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
+                </div>
+                <div className="mobile-header-actions">
+                  <i className="fas fa-edit"></i>
+                  <img 
+                    src={profileAvatar} 
+                    alt="Profile" 
+                    className="mobile-profile-pic"
+                    onClick={() => window.location.href = '/profile'}
+                  />
+                </div>
               </div>
             </div>
-            <div className="mobile-chat-actions">
-              <i className="fas fa-video"></i>
-              <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
-              <i className="fas fa-info-circle"></i>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Desktop Layout */}
-      <div className="desktop-layout">
-        {/* Left Sidebar Icons */}
-        <div className="left-sidebar">
-          <div className="sidebar-icons">
-            <div 
-              className={`icon-item ${state.activeSection === 'chats' ? 'active' : ''}`}
-              onClick={() => setActiveSection('chats')}
-            >
-              <i className="fas fa-comment"></i>
-              <div className="icon-tooltip">Chats</div>
+          {/* Mobile Chat Header - Only shown in chat view */}
+          {state.activeChat && (
+            <div className="mobile-chat-header">
+              <div className="mobile-chat-header-content">
+                <button className="mobile-back-btn" onClick={() => setState(prev => ({ ...prev, activeChat: null }))}>
+                  <i className="fas fa-arrow-left"></i>
+                </button>
+                <div className="mobile-chat-user">
+                  <div className="mobile-chat-avatar">
+                    <img src={state.activeChat.avatar} alt={state.activeChat.name} />
+                    {state.activeChat.isOnline && <div className="online-indicator"></div>}
+                  </div>
+                  <div className="mobile-chat-info">
+                    <span className="mobile-chat-name">{state.activeChat.name}</span>
+                    <span className="mobile-chat-status">{state.activeChat.isOnline ? 'Active now' : 'Offline'}</span>
+                  </div>
+                </div>
+                <div className="mobile-chat-actions">
+                  <i className="fas fa-video"></i>
+                  <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
+                </div>
+              </div>
             </div>
-            <div 
-              className={`icon-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
-              onClick={() => setActiveSection('notifications')}
-            >
-              <i className="fas fa-bell"></i>
-              <div className="icon-tooltip">Notifications</div>
-              {state.notifications.some(n => n.isNew) && (
-                <div className="notification-indicator"></div>
-              )}
-            </div>
-            <div 
-              className={`icon-item ${state.activeSection === 'requests' ? 'active' : ''}`}
-              onClick={() => setActiveSection('requests')}
-            >
-              <i className="fas fa-user-friends"></i>
-              <div className="icon-tooltip">Message Requests</div>
-              {state.messageRequests.length > 0 && (
-                <div className="notification-indicator"></div>
-              )}
-            </div>
-            <div 
-              className={`icon-item ${state.activeSection === 'archived' ? 'active' : ''}`}
-              onClick={() => setActiveSection('archived')}
-            >
-              <i className="fas fa-archive"></i>
-              <div className="icon-tooltip">Archived Chats</div>
-            </div>
-            <div className="icon-item profile-icon" onClick={() => window.location.href = '/profile'}>
-              <img src={profileAvatar} alt="Profile" />
-              <div className="icon-tooltip">Profile</div>
-            </div>
-          </div>
-        </div>
+          )}
 
-        {/* Chats/Notifications/Requests/Archived Sidebar */}
-        <div className="chats-sidebar">
-          <div className="sidebar-header">
-            <h2 className="messenger-title">
-              {state.activeSection === 'chats' ? 'Messenger' :
-               state.activeSection === 'notifications' ? 'Notifications' :
-               state.activeSection === 'requests' ? 'Message Requests' : 'Archived chats'}
-            </h2>
-            <div className="header-icons">
-              <i className="fas fa-edit" style={{ display: state.activeSection === 'chats' ? 'block' : 'none' }}></i>
-              <i className="fas fa-cog" style={{ display: state.activeSection !== 'chats' ? 'block' : 'none' }}></i>
-            </div>
-          </div>
+          {/* Mobile Content Area */}
+          <div className="mobile-content">
+            {state.activeChat ? (
+              // ===== MOBILE CHAT SCREEN =====
+              <div className="mobile-chat-screen">
+                <div className="messages-container">
+                  <div className="date-separator">
+                    <span>Today</span>
+                  </div>
+                  {state.messages.length === 0 ? (
+                    <div className="encryption-notice">
+                      <i className="fas fa-lock"></i>
+                      Messages and calls are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
+                    </div>
+                  ) : (
+                    state.messages.map(message => renderMessage(message))
+                  )}
+                </div>
 
-          <div className="search-bar">
-            <div className="search-container">
-              <i className="fas fa-search"></i>
-              <input 
-                type="text" 
-                placeholder="Search Messenger" 
-                value={state.searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
-          </div>
+                {/* FIXED BOTTOM MESSAGE INPUT */}
+                <div className="mobile-message-input-container">
+                  <div className="mobile-message-input">
+                    <div className="input-container">
+                      <i 
+                        className="fas fa-microphone" 
+                        id="microphoneButton"
+                        onClick={handleMicrophoneClick}
+                      ></i>
+                      <i 
+                        className="fas fa-paperclip" 
+                        id="attachButton"
+                        onClick={toggleAttachmentMenu}
+                      ></i>
+                      <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Type a message"
+                        value={state.newMessage}
+                        onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                      />
+                      <div className="input-actions">
+                        <i 
+                          className="fas fa-smile" 
+                          id="emojiButton"
+                          onClick={toggleEmojiPicker}
+                        ></i>
+                        <i 
+                          className="fas fa-thumbs-up" 
+                          id="likeButton"
+                          onClick={sendThumbEmoji}
+                        ></i>
+                      </div>
+                    </div>
 
-          {/* Section Content */}
-          <div className="section-content">
-            {state.searchQuery ? (
-              renderSearchResults()
+                    {/* Recording Indicator */}
+                    {state.isRecording && (
+                      <div className="recording-indicator">
+                        <div className="recording-pulse"></div>
+                        <span className="recording-text">Recording... {formatCallDuration(state.recordingTime)}</span>
+                        <button className="stop-recording-btn" onClick={stopRecording}>
+                          <i className="fas fa-stop"></i>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Emoji Picker */}
+                    {state.showEmojiPicker && (
+                      <div className="emoji-picker active">
+                        {popularEmojis.map((emoji, index) => (
+                          <div 
+                            key={index}
+                            className="emoji-option"
+                            onClick={() => addEmoji(emoji)}
+                          >
+                            {emoji}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Attachment Menu */}
+                    {state.showAttachmentMenu && (
+                      <div className="attachment-menu active">
+                        <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
+                          <i className="fas fa-image"></i>
+                          <span>Photo</span>
+                          <input 
+                            id="photoInput" 
+                            type="file" 
+                            className="file-input" 
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(e, 'image')}
+                          />
+                        </div>
+                        <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
+                          <i className="fas fa-film"></i>
+                          <span>Video</span>
+                          <input 
+                            id="videoInput" 
+                            type="file" 
+                            className="file-input" 
+                            accept="video/*"
+                            onChange={(e) => handleFileUpload(e, 'video')}
+                          />
+                        </div>
+                        <div className="attachment-option" onClick={openCamera}>
+                          <i className="fas fa-camera"></i>
+                          <span>Camera</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
-              <>
+              // ===== MOBILE MAIN MESSAGES LIST SCREEN =====
+              <div className="mobile-list-view">
+                {/* Search Bar */}
+                <div className="search-bar">
+                  <div className="search-container">
+                    <i className="fas fa-search"></i>
+                    <input 
+                      type="text" 
+                      placeholder="Search Messenger" 
+                      value={state.searchQuery}
+                      onChange={(e) => handleSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 {/* Stories Section */}
                 {state.activeSection === 'chats' && (
                   <div className="stories-section">
@@ -2148,298 +2309,518 @@ export default function ChatsPage() {
                   </div>
                 )}
 
-                {/* Chats List */}
-                {state.activeSection === 'chats' && (
-                  <div className="chats-section">
-                    <div className="chats-list">
-                      {state.chats.map(chat => (
-                        <div 
-                          key={chat.id}
-                          className={`chat-item ${chat.id === state.activeChat?.id ? 'active' : ''}`}
-                          onClick={() => handleChatClick(chat.id)}
-                          onContextMenu={(e) => handleChatRightClick(e, chat.id, 'chat')}
-                        >
-                          <div className="chat-avatar">
-                            <img src={chat.avatar} alt={chat.name} />
-                            {chat.isOnline && <div className="online-indicator"></div>}
-                          </div>
-                          <div className="chat-content">
-                            <div className="chat-header">
-                              <span className="chat-name">{chat.name}</span>
-                              <span className="chat-time">{chat.time}</span>
-                            </div>
-                            <div className="chat-preview">
-                              <span>{chat.lastMessage || 'No messages yet'}</span>
-                              {chat.unread > 0 && <span className="unread-badge">{chat.unread}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Notifications List */}
-                {state.activeSection === 'notifications' && (
-                  <div className="notifications-section">
-                    <div className="notifications-list">
-                      {state.notifications.map(notification => (
-                        <div 
-                          key={notification.id}
-                          className={`notification-item ${notification.isNew ? 'new' : ''}`}
-                          onClick={() => markNotificationAsRead(notification.id)}
-                        >
-                          <div className="notification-avatar">
-                            {notification.userAvatar ? (
-                              <img src={notification.userAvatar} alt={notification.title} />
-                            ) : notification.pageAvatar ? (
-                              <img src={notification.pageAvatar} alt={notification.title} />
-                            ) : (
-                              <div className="system-avatar">
-                                <i className="fas fa-bell"></i>
+                {/* Content based on active section */}
+                <div className="mobile-section-content">
+                  {state.searchQuery ? (
+                    renderSearchResults()
+                  ) : (
+                    <>
+                      {/* Chats List - FIXED FOR MOBILE WITH NAMES AND TIMESTAMPS */}
+                      {state.activeSection === 'chats' && (
+                        <div className="mobile-chats-list">
+                          {state.chats.map(chat => (
+                            <div 
+                              key={chat.id}
+                              className="mobile-chat-item"
+                              data-chat-id={chat.id}
+                              onClick={() => !state.contextMenu.visible && handleChatClick(chat.id)}
+                              onContextMenu={(e) => handleChatRightClick(e, chat.id, 'chat')}
+                              onTouchStart={(e) => handleChatTouchStart(chat.id, 'chat', e)}
+                              onTouchEnd={handleChatTouchEnd}
+                            >
+                              <div className="mobile-chat-avatar">
+                                <img src={chat.avatar} alt={chat.name} />
+                                {chat.isOnline && <div className="mobile-online-indicator"></div>}
                               </div>
-                            )}
-                          </div>
-                          <div className="notification-content">
-                            <div className="notification-header">
-                              <span className="notification-title">{notification.title}</span>
-                              <span className="notification-time">{notification.time}</span>
+                              <div className="mobile-chat-info">
+                                <div className="mobile-chat-header">
+                                  <span className="mobile-chat-name">{chat.name}</span>
+                                  <span className="mobile-chat-time">{chat.time}</span>
+                                </div>
+                                <div className="mobile-chat-preview">
+                                  <span className="mobile-last-message">{chat.lastMessage}</span>
+                                  {chat.unread > 0 && <span className="mobile-unread-badge">{chat.unread}</span>}
+                                </div>
+                              </div>
                             </div>
-                            <div className="notification-description">
-                              {notification.description}
-                            </div>
-                          </div>
-                          {notification.isNew && <div className="new-notification-indicator"></div>}
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      )}
 
-                {/* Requests Section */}
-                {state.activeSection === 'requests' && (
-                  <div className="requests-section">
-                    {renderRequestsTabs()}
-                    {renderRequestsContent()}
-                  </div>
-                )}
-
-                {/* Archived Section */}
-                {state.activeSection === 'archived' && (
-                  <div className="archived-section">
-                    <div className="archived-list">
-                      {state.archivedChats.map(chat => (
-                        <div 
-                          key={chat.id}
-                          className="archived-item"
-                          onClick={() => handleChatClick(chat.id)}
-                          onContextMenu={(e) => handleChatRightClick(e, chat.id, 'archived')}
-                        >
-                          <div className="archived-avatar">
-                            <img src={chat.avatar} alt={chat.name} />
-                          </div>
-                          <div className="archived-content">
-                            <div className="archived-header">
-                              <span className="archived-name">{chat.name}</span>
-                              <span className="archived-time">{chat.time}</span>
+                      {/* Notifications List */}
+                      {state.activeSection === 'notifications' && (
+                        <div className="notifications-list">
+                          {state.notifications.map(notification => (
+                            <div 
+                              key={notification.id}
+                              className="notification-item"
+                              onClick={() => markNotificationAsRead(notification.id)}
+                            >
+                              <div className="notification-avatar">
+                                {notification.userAvatar ? (
+                                  <img src={notification.userAvatar} alt={notification.title} />
+                                ) : notification.pageAvatar ? (
+                                  <img src={notification.pageAvatar} alt={notification.title} />
+                                ) : (
+                                  <div className="system-avatar">
+                                    <i className="fas fa-bell"></i>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="notification-content">
+                                <div className="notification-header">
+                                  <span className="notification-title">{notification.title}</span>
+                                  <span className="notification-time">{notification.time}</span>
+                                </div>
+                                <div className="notification-description">
+                                  {notification.description}
+                                </div>
+                              </div>
+                              {notification.isNew && <div className="new-notification-indicator"></div>}
                             </div>
-                            <div className="archived-preview">
-                              <span>{chat.lastMessage}</span>
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+                      )}
+
+                      {/* Requests Section */}
+                      {state.activeSection === 'requests' && (
+                        <div className="requests-section">
+                          {renderRequestsTabs()}
+                          {renderRequestsContent()}
+                        </div>
+                      )}
+
+                      {/* ===== FIXED: Archived Section with Working Chat Opening ===== */}
+                      {state.activeSection === 'archived' && (
+                        <div className="archived-list">
+                          {state.archivedChats.map(chat => (
+                            <div 
+                              key={chat.id}
+                              className="archived-item"
+                              data-chat-id={chat.id}
+                              onClick={() => !state.contextMenu.visible && handleChatClick(chat.id)}
+                              onContextMenu={(e) => handleChatRightClick(e, chat.id, 'archived')}
+                              onTouchStart={(e) => handleChatTouchStart(chat.id, 'archived', e)}
+                              onTouchEnd={handleChatTouchEnd}
+                            >
+                              <div className="archived-avatar">
+                                <img src={chat.avatar} alt={chat.name} />
+                              </div>
+                              <div className="archived-content">
+                                <div className="archived-header">
+                                  <span className="archived-name">{chat.name}</span>
+                                  <span className="archived-time">{chat.time}</span>
+                                </div>
+                                <div className="archived-preview">
+                                  <span className="archived-preview-text">{chat.lastMessage}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Main Chat Area */}
-        <div className="main-chat">
-          {state.activeChat ? (
-            <div className="chat-window">
-              <div className="chat-header">
-                <div className="chat-user">
-                  <div className="user-avatar">
-                    <img src={state.activeChat.avatar} alt={state.activeChat.name} />
-                    {state.activeChat.isOnline && <div className="online-indicator"></div>}
-                  </div>
-                  <div className="user-info">
-                    <span className="user-name">{state.activeChat.name}</span>
-                    <span className={`user-status ${state.activeChat.isOnline ? 'online' : 'offline'}`}>
-                      {state.activeChat.isOnline ? 'Active now' : 'Offline'}
-                    </span>
-                  </div>
+          {/* Mobile Bottom Navigation - Only shown in main list view */}
+          {!state.activeChat && (
+            <div className="mobile-bottom-nav">
+              <div className="mobile-nav-items">
+                <div 
+                  className={`mobile-nav-item ${state.activeSection === 'chats' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('chats')}
+                >
+                  <i className="fas fa-comment"></i>
+                  <span>Chats</span>
                 </div>
-                <div className="chat-actions">
-                  <i className="fas fa-video"></i>
-                  <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
-                  <i className="fas fa-info-circle"></i>
+                <div 
+                  className={`mobile-nav-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('notifications')}
+                >
+                  <i className="fas fa-bell"></i>
+                  <span>Notifications</span>
+                  {state.notifications.some(n => n.isNew) && (
+                    <div className="mobile-nav-indicator"></div>
+                  )}
                 </div>
-              </div>
-
-              <div className="messages-container">
-                <div className="date-separator">
-                  <span>Today</span>
+                <div 
+                  className={`mobile-nav-item ${state.activeSection === 'requests' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('requests')}
+                >
+                  <i className="fas fa-user-friends"></i>
+                  <span>Message Request</span>
+                  {state.messageRequests.length > 0 && (
+                    <div className="mobile-nav-indicator"></div>
+                  )}
                 </div>
-                {state.messages.length === 0 ? (
-                  <div className="encryption-notice">
-                    <i className="fas fa-lock"></i>
-                    Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
-                  </div>
-                ) : (
-                  state.messages.map(message => renderMessage(message))
-                )}
-              </div>
-
-              <div className="message-input">
-                <div className="input-container">
-                  <i 
-                    className="fas fa-microphone" 
-                    id="microphoneButton"
-                    onClick={handleMicrophoneClick}
-                  ></i>
-                  <i 
-                    className="fas fa-paperclip" 
-                    id="attachButton"
-                    onClick={toggleAttachmentMenu}
-                  ></i>
-                  <input 
-                    type="text" 
-                    id="messageInput" 
-                    placeholder="Type a message"
-                    value={state.newMessage}
-                    onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
-                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  />
-                  <div className="input-actions">
-                    <i 
-                      className="fas fa-smile" 
-                      id="emojiButton"
-                      onClick={toggleEmojiPicker}
-                    ></i>
-                    <i 
-                      className="fas fa-thumbs-up" 
-                      id="likeButton"
-                      onClick={sendLike}
-                    ></i>
-                  </div>
+                <div 
+                  className={`mobile-nav-item ${state.activeSection === 'archived' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('archived')}
+                >
+                  <i className="fas fa-archive"></i>
+                  <span>Archived Chats</span>
                 </div>
-
-                {/* Recording Indicator */}
-                {state.isRecording && (
-                  <div className="recording-indicator">
-                    <div className="recording-pulse"></div>
-                    <span className="recording-text">Recording... {formatCallDuration(state.recordingTime)}</span>
-                    <button className="stop-recording-btn" onClick={stopRecording}>
-                      <i className="fas fa-stop"></i>
-                    </button>
-                  </div>
-                )}
-
-                {/* Emoji Picker */}
-                {state.showEmojiPicker && (
-                  <div className="emoji-picker active">
-                    {popularEmojis.map((emoji, index) => (
-                      <div 
-                        key={index}
-                        className="emoji-option"
-                        onClick={() => addEmoji(emoji)}
-                      >
-                        {emoji}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Attachment Menu */}
-                {state.showAttachmentMenu && (
-                  <div className="attachment-menu active">
-                    <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
-                      <i className="fas fa-image"></i>
-                      <span>Photo</span>
-                      <input 
-                        id="photoInput" 
-                        type="file" 
-                        className="file-input" 
-                        accept="image/*"
-                        onChange={(e) => handleFileUpload(e, 'image')}
-                      />
-                    </div>
-                    <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
-                      <i className="fas fa-film"></i>
-                      <span>Video</span>
-                      <input 
-                        id="videoInput" 
-                        type="file" 
-                        className="file-input" 
-                        accept="video/*"
-                        onChange={(e) => handleFileUpload(e, 'video')}
-                      />
-                    </div>
-                    <div className="attachment-option" onClick={openCamera}>
-                      <i className="fas fa-camera"></i>
-                      <span>Camera</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="chat-placeholder">
-              <div className="placeholder-content">
-                <i className="fas fa-comments"></i>
-                <h3>Your Messages</h3>
-                <p>Send private messages to a friend or group.</p>
-                <button className="send-message-btn">Send Message</button>
               </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Mobile Bottom Navigation */}
-      <div className="mobile-bottom-nav">
-        <div className="mobile-nav-items">
-          <div 
-            className={`mobile-nav-item ${state.activeSection === 'chats' ? 'active' : ''}`}
-            onClick={() => setActiveSection('chats')}
-          >
-            <i className="fas fa-comment"></i>
-            <span>Chats</span>
+      {/* Desktop Layout - Hidden on Mobile */}
+      {!state.isMobile && (
+        <div className="desktop-layout">
+          {/* Left Sidebar Icons */}
+          <div className="left-sidebar">
+            <div className="sidebar-icons">
+              <div 
+                className={`icon-item ${state.activeSection === 'chats' ? 'active' : ''}`}
+                onClick={() => setActiveSection('chats')}
+              >
+                <i className="fas fa-comment"></i>
+                <div className="icon-tooltip">Chats</div>
+              </div>
+              <div 
+                className={`icon-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
+                onClick={() => setActiveSection('notifications')}
+              >
+                <i className="fas fa-bell"></i>
+                <div className="icon-tooltip">Notifications</div>
+                {state.notifications.some(n => n.isNew) && (
+                  <div className="notification-indicator"></div>
+                )}
+              </div>
+              <div 
+                className={`icon-item ${state.activeSection === 'requests' ? 'active' : ''}`}
+                onClick={() => setActiveSection('requests')}
+              >
+                <i className="fas fa-user-friends"></i>
+                <div className="icon-tooltip">Message Requests</div>
+                {state.messageRequests.length > 0 && (
+                  <div className="notification-indicator"></div>
+                )}
+              </div>
+              <div 
+                className={`icon-item ${state.activeSection === 'archived' ? 'active' : ''}`}
+                onClick={() => setActiveSection('archived')}
+              >
+                <i className="fas fa-archive"></i>
+                <div className="icon-tooltip">Archived Chats</div>
+              </div>
+              <div className="icon-item profile-icon" onClick={() => window.location.href = '/profile'}>
+                <img src={profileAvatar} alt="Profile" />
+                <div className="icon-tooltip">Profile</div>
+              </div>
+            </div>
           </div>
-          <div 
-            className={`mobile-nav-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
-            onClick={() => setActiveSection('notifications')}
-          >
-            <i className="fas fa-bell"></i>
-            <span>Notifications</span>
-            {state.notifications.some(n => n.isNew) && (
-              <div className="mobile-nav-indicator"></div>
+
+          {/* Chats/Notifications/Requests/Archived Sidebar */}
+          <div className="chats-sidebar">
+            <div className="sidebar-header">
+              <h2 className="messenger-title" style={{color: '#1877f2'}}>
+                {state.activeSection === 'chats' ? 'Messenger' :
+                 state.activeSection === 'notifications' ? 'Notifications' :
+                 state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
+              </h2>
+              <div className="header-icons">
+                <i className="fas fa-edit" style={{ display: state.activeSection === 'chats' ? 'block' : 'none' }}></i>
+                <i className="fas fa-cog" style={{ display: state.activeSection !== 'chats' ? 'block' : 'none' }}></i>
+              </div>
+            </div>
+
+            <div className="search-bar">
+              <div className="search-container">
+                <i className="fas fa-search"></i>
+                <input 
+                  type="text" 
+                  placeholder="Search Messenger" 
+                  value={state.searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Section Content */}
+            <div className="section-content">
+              {state.searchQuery ? (
+                renderSearchResults()
+              ) : (
+                <>
+                  {/* Stories Section */}
+                  {state.activeSection === 'chats' && (
+                    <div className="stories-section">
+                      <div className="stories-header">
+                        <span className="stories-title">Stories</span>
+                        {mutedStories.length > 0 && !state.showMutedStories && (
+                          <button className="mute-stories-btn" onClick={showMutedStoriesSection}>
+                            Muted Stories ({mutedStories.length})
+                          </button>
+                        )}
+                        {state.showMutedStories && (
+                          <button className="back-to-stories-btn" onClick={hideMutedStoriesSection}>
+                            Back to Stories
+                          </button>
+                        )}
+                      </div>
+                      {!state.showMutedStories ? renderStories(normalStories) : renderMutedStories(mutedStories)}
+                    </div>
+                  )}
+
+                  {/* Chats List - FIXED WITH NAMES AND TIMESTAMPS */}
+                  {state.activeSection === 'chats' && (
+                    <div className="chats-section">
+                      <div className="chats-list">
+                        {state.chats.map(chat => (
+                          <div 
+                            key={chat.id}
+                            className={`chat-item ${chat.id === state.activeChat?.id ? 'active' : ''}`}
+                            onClick={() => handleChatClick(chat.id)}
+                            onContextMenu={(e) => handleChatRightClick(e, chat.id, 'chat')}
+                          >
+                            <div className="chat-avatar">
+                              <img src={chat.avatar} alt={chat.name} />
+                              {chat.isOnline && <div className="online-indicator"></div>}
+                            </div>
+                            <div className="chat-content">
+                              <div className="chat-header">
+                                <span className="chat-name">{chat.name}</span>
+                                <span className="chat-time">{chat.time}</span>
+                              </div>
+                              <div className="chat-preview">
+                                <span className="chat-preview-text">{chat.lastMessage || 'No messages yet'}</span>
+                                {chat.unread > 0 && <span className="unread-badge">{chat.unread}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notifications List */}
+                  {state.activeSection === 'notifications' && (
+                    <div className="notifications-section">
+                      <div className="notifications-list">
+                        {state.notifications.map(notification => (
+                          <div 
+                            key={notification.id}
+                            className={`notification-item ${notification.isNew ? 'new' : ''}`}
+                            onClick={() => markNotificationAsRead(notification.id)}
+                          >
+                            <div className="notification-avatar">
+                              {notification.userAvatar ? (
+                                <img src={notification.userAvatar} alt={notification.title} />
+                              ) : notification.pageAvatar ? (
+                                <img src={notification.pageAvatar} alt={notification.title} />
+                              ) : (
+                                <div className="system-avatar">
+                                  <i className="fas fa-bell"></i>
+                                </div>
+                              )}
+                            </div>
+                            <div className="notification-content">
+                              <div className="notification-header">
+                                <span className="notification-title">{notification.title}</span>
+                                <span className="notification-time">{notification.time}</span>
+                              </div>
+                              <div className="notification-description">
+                                {notification.description}
+                              </div>
+                            </div>
+                            {notification.isNew && <div className="new-notification-indicator"></div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Requests Section */}
+                  {state.activeSection === 'requests' && (
+                    <div className="requests-section">
+                      {renderRequestsTabs()}
+                      {renderRequestsContent()}
+                    </div>
+                  )}
+
+                  {/* ===== FIXED: Archived Section with Working Chat Opening ===== */}
+                  {state.activeSection === 'archived' && (
+                    <div className="archived-section">
+                      <div className="archived-list">
+                        {state.archivedChats.map(chat => (
+                          <div 
+                            key={chat.id}
+                            className="archived-item"
+                            onClick={() => handleChatClick(chat.id)}
+                            onContextMenu={(e) => handleChatRightClick(e, chat.id, 'archived')}
+                          >
+                            <div className="archived-avatar">
+                              <img src={chat.avatar} alt={chat.name} />
+                            </div>
+                            <div className="archived-content">
+                              <div className="archived-header">
+                                <span className="archived-name">{chat.name}</span>
+                                <span className="archived-time">{chat.time}</span>
+                              </div>
+                              <div className="archived-preview">
+                                <span className="archived-preview-text">{chat.lastMessage}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Main Chat Area */}
+          <div className="main-chat">
+            {state.activeChat ? (
+              <div className="chat-window">
+                <div className="chat-header">
+                  <div className="chat-user">
+                    <div className="user-avatar">
+                      <img src={state.activeChat.avatar} alt={state.activeChat.name} />
+                      {state.activeChat.isOnline && <div className="online-indicator"></div>}
+                    </div>
+                    <div className="user-info">
+                      <span className="user-name">{state.activeChat.name}</span>
+                      <span className={`user-status ${state.activeChat.isOnline ? 'online' : 'offline'}`}>
+                        {state.activeChat.isOnline ? 'Active now' : 'Offline'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="chat-actions">
+                    <i className="fas fa-video"></i>
+                    <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
+                  </div>
+                </div>
+
+                <div className="messages-container">
+                  <div className="date-separator">
+                    <span>Today</span>
+                  </div>
+                  {state.messages.length === 0 ? (
+                    <div className="encryption-notice">
+                      <i className="fas fa-lock"></i>
+                      Messages and calls are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
+                    </div>
+                  ) : (
+                    state.messages.map(message => renderMessage(message))
+                  )}
+                </div>
+
+                <div className="message-input">
+                  <div className="input-container">
+                    <i 
+                      className="fas fa-microphone" 
+                      id="microphoneButton"
+                      onClick={handleMicrophoneClick}
+                    ></i>
+                    <i 
+                      className="fas fa-paperclip" 
+                      id="attachButton"
+                      onClick={toggleAttachmentMenu}
+                    ></i>
+                    <input 
+                      type="text" 
+                      id="messageInput" 
+                      placeholder="Type a message"
+                      value={state.newMessage}
+                      onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
+                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    />
+                    <div className="input-actions">
+                      <i 
+                        className="fas fa-smile" 
+                        id="emojiButton"
+                        onClick={toggleEmojiPicker}
+                      ></i>
+                      <i 
+                        className="fas fa-thumbs-up" 
+                        id="likeButton"
+                        onClick={sendThumbEmoji}
+                      ></i>
+                    </div>
+                  </div>
+
+                  {/* Recording Indicator */}
+                  {state.isRecording && (
+                    <div className="recording-indicator">
+                      <div className="recording-pulse"></div>
+                      <span className="recording-text">Recording... {formatCallDuration(state.recordingTime)}</span>
+                      <button className="stop-recording-btn" onClick={stopRecording}>
+                        <i className="fas fa-stop"></i>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Emoji Picker */}
+                  {state.showEmojiPicker && (
+                    <div className="emoji-picker active">
+                      {popularEmojis.map((emoji, index) => (
+                        <div 
+                          key={index}
+                          className="emoji-option"
+                          onClick={() => addEmoji(emoji)}
+                        >
+                          {emoji}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Attachment Menu */}
+                  {state.showAttachmentMenu && (
+                    <div className="attachment-menu active">
+                      <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
+                        <i className="fas fa-image"></i>
+                        <span>Photo</span>
+                        <input 
+                          id="photoInput" 
+                          type="file" 
+                          className="file-input" 
+                          accept="image/*"
+                          onChange={(e) => handleFileUpload(e, 'image')}
+                        />
+                      </div>
+                      <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
+                        <i className="fas fa-film"></i>
+                        <span>Video</span>
+                        <input 
+                          id="videoInput" 
+                          type="file" 
+                          className="file-input" 
+                          accept="video/*"
+                          onChange={(e) => handleFileUpload(e, 'video')}
+                        />
+                      </div>
+                      <div className="attachment-option" onClick={openCamera}>
+                        <i className="fas fa-camera"></i>
+                        <span>Camera</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="chat-placeholder">
+                <div className="placeholder-content">
+                  <i className="fas fa-comments"></i>
+                  <h3>Your Messages</h3>
+                  <p>Send private messages to a friend or group.</p>
+                  <button className="send-message-btn">Send Message</button>
+                </div>
+              </div>
             )}
-          </div>
-          <div 
-            className={`mobile-nav-item ${state.activeSection === 'requests' ? 'active' : ''}`}
-            onClick={() => setActiveSection('requests')}
-          >
-            <i className="fas fa-user-friends"></i>
-            <span>Requests</span>
-            {state.messageRequests.length > 0 && (
-              <div className="mobile-nav-indicator"></div>
-            )}
-          </div>
-          <div 
-            className={`mobile-nav-item ${state.activeSection === 'archived' ? 'active' : ''}`}
-            onClick={() => setActiveSection('archived')}
-          >
-            <i className="fas fa-archive"></i>
-            <span>Archived</span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Send Request Modal */}
       {state.showSendRequestModal && (
@@ -2607,29 +2988,76 @@ export default function ChatsPage() {
         </div>
       )}
 
+      {/* Context Menus */}
+      {/* Chat Context Menu */}
+      {state.contextMenu.visible && (
+        <div 
+          className={`chat-context-menu ${state.contextMenu.visible ? 'active' : ''}`}
+          style={{
+            position: 'fixed',
+            left: Math.min(state.contextMenu.x, window.innerWidth - 200),
+            top: Math.min(state.contextMenu.y, window.innerHeight - 200),
+            zIndex: 1000
+          }}
+        >
+          {state.contextMenu.type === 'chat' && (
+            <>
+              <div className="context-menu-item" onClick={handleDeleteFromContextMenu}>
+                <i className="fas fa-trash"></i>
+                <span>Delete Chat</span>
+              </div>
+              <div className="context-menu-item" onClick={handleArchiveFromContextMenu}>
+                <i className="fas fa-archive"></i>
+                <span>Archive Chat</span>
+              </div>
+              <div className="context-menu-item">
+                <i className="fas fa-bell-slash"></i>
+                <span>Mute Notifications</span>
+              </div>
+            </>
+          )}
+          {state.contextMenu.type === 'archived' && (
+            <>
+              <div className="context-menu-item" onClick={handleDeleteFromContextMenu}>
+                <i className="fas fa-trash"></i>
+                <span>Delete Chat</span>
+              </div>
+              <div className="context-menu-item" onClick={handleUnarchiveFromContextMenu}>
+                <i className="fas fa-inbox"></i>
+                <span>Unarchive Chat</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Story Context Menu */}
       {state.storyContextMenu.visible && (
         <div 
-          className="story-context-menu active"
-          style={{ left: state.storyContextMenu.x, top: state.storyContextMenu.y }}
+          className={`story-context-menu ${state.storyContextMenu.visible ? 'active' : ''}`}
+          style={{
+            position: 'fixed',
+            left: Math.min(state.storyContextMenu.x, window.innerWidth - 200),
+            top: Math.min(state.storyContextMenu.y, window.innerHeight - 200),
+            zIndex: 1000
+          }}
         >
           {state.storyContextMenu.storyId === yourStory.id ? (
             <div className="context-menu-item delete" onClick={() => deleteStory(yourStory.id)}>
               <i className="fas fa-trash"></i>
-              Delete Story
+              <span>Delete Story</span>
             </div>
           ) : (
             <>
-              {!state.storyContextMenu.isMutedStory && (
-                <div className="context-menu-item" onClick={() => muteStory(state.storyContextMenu.storyId!)}>
-                  <i className="fas fa-volume-mute"></i>
-                  Mute Story
-                </div>
-              )}
-              {state.storyContextMenu.isMutedStory && (
+              {state.storyContextMenu.isMutedStory ? (
                 <div className="context-menu-item" onClick={() => unmuteStory(state.storyContextMenu.storyId!)}>
                   <i className="fas fa-volume-up"></i>
-                  Unmute Story
+                  <span>Unmute Story</span>
+                </div>
+              ) : (
+                <div className="context-menu-item" onClick={() => muteStory(state.storyContextMenu.storyId!)}>
+                  <i className="fas fa-volume-mute"></i>
+                  <span>Mute Story</span>
                 </div>
               )}
             </>
@@ -2637,38 +3065,8 @@ export default function ChatsPage() {
         </div>
       )}
 
-      {/* Chat Context Menu */}
-      {state.contextMenu.visible && (
-        <div 
-          className="chat-context-menu active"
-          style={{ left: state.contextMenu.x, top: state.contextMenu.y }}
-        >
-          {state.contextMenu.type === 'chat' && (
-            <div className="context-menu-item" onClick={handleArchiveFromContextMenu}>
-              <i className="fas fa-archive"></i>
-              Archive Chat
-            </div>
-          )}
-          {state.contextMenu.type === 'archived' && (
-            <div className="context-menu-item" onClick={handleUnarchiveFromContextMenu}>
-              <i className="fas fa-inbox"></i>
-              Unarchive Chat
-            </div>
-          )}
-          <div className="context-menu-item">
-            <i className="fas fa-bell-slash"></i>
-            Mute Notifications
-          </div>
-          <div className="context-menu-item delete" onClick={handleDeleteFromContextMenu}>
-            <i className="fas fa-trash"></i>
-            Delete Chat
-          </div>
-        </div>
-      )}
-
       {/* Call Interfaces */}
-      {(state.callState.isIncomingCall || state.callState.isOutgoingCall || 
-        state.callState.isCallActive || state.callState.isCallEnded) && (
+      {(state.callState.isOutgoingCall || state.callState.isCallActive || state.callState.isCallEnded) && (
         <>
           <div className="call-interface-overlay"></div>
           <div className="call-interface">
@@ -2680,8 +3078,7 @@ export default function ChatsPage() {
               />
               <h2 className="call-user-name">{state.callState.callRecipient?.name || 'Unknown'}</h2>
               <p className="call-status">
-                {state.callState.isIncomingCall ? 'Incoming Call...' :
-                 state.callState.isOutgoingCall ? 'Ringing...' :
+                {state.callState.isOutgoingCall ? 'Ringing...' :
                  state.callState.isCallActive ? 'Connected' :
                  'Call Ended'}
               </p>
@@ -2712,16 +3109,6 @@ export default function ChatsPage() {
             )}
 
             <div className="call-actions">
-              {state.callState.isIncomingCall && (
-                <>
-                  <button className="call-action-btn decline-call" onClick={declineCall}>
-                    <i className="fas fa-phone-slash"></i>
-                  </button>
-                  <button className="call-action-btn answer-call" onClick={answerCall}>
-                    <i className="fas fa-phone"></i>
-                  </button>
-                </>
-              )}
               {state.callState.isOutgoingCall && (
                 <button className="call-action-btn cancel-call" onClick={cancelOutgoingCall}>
                   <i className="fas fa-phone-slash"></i>

@@ -4,6 +4,9 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import '../auth.css';
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const URL="http://127.0.0.1:8000/api/v1"
+
 
 interface ResetPasswordState {
   newPassword: string;
@@ -27,7 +30,6 @@ function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const urlToken = searchParams.get('token');
   
-  const API_BASE_URL = "https://messanger-semester-project.vercel.app/api/v1"
 
   // Use URL token if available, otherwise use manual token
   const token = urlToken || (showManualToken ? state.manualToken : null);
@@ -60,7 +62,8 @@ function ResetPasswordContent() {
     setMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+      // const response = await fetch(`${API_BASE_URL}/users/reset-password`
+      const response = await fetch(`${URL}/users/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

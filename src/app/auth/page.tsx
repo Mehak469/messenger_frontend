@@ -1,6 +1,10 @@
-"use client";
-import { useState, useEffect } from 'react'
-import './auth.css'
+'use client';
+import { useState, useEffect } from 'react';
+import './auth.css';
+import { useRouter } from 'next/navigation';
+
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const URL="http://127.0.0.1:8000/api/v1"
 
 interface AuthState {
   isLogin: boolean;
@@ -11,49 +15,30 @@ interface AuthState {
 }
 
 interface User {
-  id?: string;
-  user_id?: string;
   _id?: string;
   name?: string;
   username?: string;
   email?: string;
-  token?: string;
-  // Add any other fields your backend might return
+  avatar?: string;
+  bio?: string;
+  created_at?: string;
+  updates_at?: string;
 }
 
 export default function AuthPage() {
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>({
     isLogin: true,
     email: '',
     password: '',
     username: '',
-    loading: false
-  })
+    loading: false,
+  });
 
-  const [errorMessage, setErrorMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const API_BASE_URL = "https://messanger-semester-project.vercel.app/api/v1"
 
-  useEffect(() => {
-    const checkAuth = () => {
-      try {
-        const userData = localStorage.getItem('messengerUser')
-        if (userData) {
-          const user: User = JSON.parse(userData)
-          // Check if any user identifier exists
-          if (user?.id || user?.user_id || user?._id || user?.email) {
-            window.location.href = '/chats'
-          }
-        }
-      } catch (error) {
-        console.error('Error checking authentication:', error)
-        localStorage.removeItem('messengerUser')
-      }
-    }
-
-    checkAuth()
-  }, [])
-
+  // Toggle between login/register
   const toggleAuthMode = () => {
     setAuthState(prev => ({
       ...prev,
@@ -61,221 +46,163 @@ export default function AuthPage() {
       username: '',
       email: '',
       password: ''
-    }))
-    setErrorMessage('')
-  }
+    }));
+    setErrorMessage('');
+  };
 
+  // Form validation
   const validateForm = (): boolean => {
-    const { email, password, username, isLogin } = authState
+    const { email, password, username, isLogin } = authState;
 
     if (!email.trim() || !password || (!isLogin && !username.trim())) {
-      setErrorMessage("Please fill in all required fields.")
-      return false
+      setErrorMessage("Please fill in all required fields.");
+      return false;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setErrorMessage("Please enter a valid email address.")
-      return false
+      setErrorMessage("Please enter a valid email address.");
+      return false;
     }
 
     if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters.")
-      return false
+      setErrorMessage("Password must be at least 6 characters.");
+      return false;
     }
 
     if (!isLogin && username.trim().length < 3) {
-      setErrorMessage("Username must be at least 3 characters.")
-      return false
+      setErrorMessage("Username must be at least 3 characters.");
+      return false;
     }
 
-    return true
-  }
+    return true;
+  };
 
+  // Handle login/register submit
   const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return;
 
-    const { email, password, username, isLogin } = authState
-
-    setAuthState(prev => ({ ...prev, loading: true }))
-    setErrorMessage("")
+    const { email, password, username, isLogin } = authState;
+    setAuthState(prev => ({ ...prev, loading: true }));
+    setErrorMessage('');
 
     try {
-      const endpoint = isLogin ? "users/login" : "users/register"
-      const url = `${API_BASE_URL}/${endpoint}`
-
-      console.log('Making request to:', url) // Debug
+      const endpoint = isLogin ? 'users/login' : 'users/register';
+      // const url = `${API_BASE_URL}/${endpoint}`;
+      const url = `${URL}/${endpoint}`;
 
       const payload = isLogin
         ? { email, password }
-        : {
-          name: username.trim(),
-          username: username.trim().toLowerCase(),
-          email: email.trim(),
-          password
-        }
-
-      console.log('Request payload:', payload) // Debug
+        : { name: username.trim(), username: username.trim().toLowerCase(), email: email.trim(), password };
+        console.log('Request payload:', payload) // Debug
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000)
 
       const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+          "accept": "application/json"
+
+         },
         body: JSON.stringify(payload),
         signal: controller.signal
-      })
 
-      clearTimeout(timeoutId)
-
-      console.log('Response status:', res.status) // Debug
+      });
+       clearTimeout(timeoutId)
 
       if (!res.ok) {
-        const errorText = await res.text()
-        console.error('Error response:', errorText) // Debug
-        let errorData
+        const errorText = await res.text();
+        let errorData;
         try {
-          errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || errorData.message || errorData.error || `Request failed with status ${res.status}`)
+          errorData = JSON.parse(errorText);
+          throw new Error(errorData.detail || errorData.message || errorData.error || `Request failed with status ${res.status}`);
         } catch {
-          throw new Error(`HTTP ${res.status}: ${errorText}`)
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
       }
 
-      const data = await res.json()
-      console.log('Full API response:', data) // Debug the complete response
+      let data = await res.json();
 
-      // Handle different response formats
-      let userData: User = {}
+// ✅ Store tokens
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
 
-      // Case 1: Direct user object in response
-      if (data.id || data.user_id || data._id || data.email) {
-        userData = data
-      }
-      // Case 2: Nested user object
-      else if (data.user && (data.user.id || data.user.user_id || data.user._id || data.user.email)) {
-        userData = data.user
-      }
-      // Case 3: Data field contains user
-      else if (data.data && (data.data.id || data.data.user_id || data.data._id || data.data.email)) {
-        userData = data.data
-      }
-      // Case 4: Try to extract any user-like object
-      else {
-        // Look for any key that might contain user data
-        const possibleUserKeys = ['user', 'data', 'userData', 'result']
-        for (const key of possibleUserKeys) {
-          if (data[key] && (data[key].id || data[key].user_id || data[key]._id || data[key].email)) {
-            userData = data[key]
-            break
-          }
-        }
+     
+     const userData = {
+        _id: data.user?._id,
+        name: data.user?.name,
+        username: data.user?.username,
+        email: data.user?.email,
+        avatar: data.user?.avatar,
+        bio: data.user?.bio,
+        created_at: data.user?.created_at,
+        updates_at:data.user?.updates_at,
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
 
-        // If no nested user found, use the entire response
-        if (!userData.id && !userData.user_id && !userData._id) {
-          userData = data
-        }
-      }
+      setErrorMessage(isLogin ? "Successfully logged in! Redirecting..." : "Account created successfully! Redirecting...");
 
-      console.log('Extracted user data:', userData) // Debug
-
-      // Check if we have at least some user identifier
-      const hasUserIdentifier = userData.id || userData.user_id || userData._id || userData.email
-
-      if (!hasUserIdentifier) {
-        console.warn('No clear user identifier found in response, but storing anyway:', userData)
-        // Continue anyway - maybe the backend doesn't return user data immediately
-      }
-
-      // Store whatever user data we got
-      localStorage.setItem("messengerUser", JSON.stringify(userData))
-
-      setErrorMessage(
-        isLogin ? "Successfully logged in! Redirecting..." : "Account created successfully! Redirecting..."
-      )
-
-      setTimeout(() => {
-        window.location.href = "/chats"
-      }, 1000)
+     router.push('/chats');
 
     } catch (err: unknown) {
-      console.error('Auth error:', err)
+      console.error('Auth error:', err);
 
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
-          setErrorMessage("Request timeout: Server is not responding.")
+          setErrorMessage("Request timeout: Server is not responding.");
         } else if (err.message.includes('Failed to fetch')) {
-          setErrorMessage(
-            `Cannot connect to server. Please ensure:\n\n` +
-            `• Backend is running on port 8000\n` +
-            `• URL: ${API_BASE_URL}\n` +
-            `• No CORS issues`
-          )
+          setErrorMessage(`Cannot connect to server. Ensure backend is running and URL is correct.`);
         } else {
-          setErrorMessage(err.message)
+          setErrorMessage(err.message);
         }
       } else {
-        setErrorMessage("An unexpected error occurred. Please try again.")
+        setErrorMessage("An unexpected error occurred. Please try again.");
       }
     } finally {
-      setAuthState(prev => ({ ...prev, loading: false }))
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  }
+  };
 
+  // Handle input changes
   const handleInputChange = (field: keyof Omit<AuthState, 'isLogin' | 'loading'>) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setAuthState(prev => ({ ...prev, [field]: e.target.value }))
-      if (errorMessage) {
-        setErrorMessage('')
-      }
-    }
+      setAuthState(prev => ({ ...prev, [field]: e.target.value }));
+      if (errorMessage) setErrorMessage('');
+    };
 
   return (
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-icon">
-            <i className="fas fa-comments"></i>
-          </div>
-          <h1 className="auth-title">
-            {authState.isLogin ? 'Welcome back' : 'Create account'}
-          </h1>
-          <p className="auth-subtitle">
-            {authState.isLogin ? 'Sign in to continue chatting' : 'Join Messenger to start connecting'}
-          </p>
+          <div className="auth-icon"><i className="fas fa-comments"></i></div>
+          <h1 className="auth-title">{authState.isLogin ? 'Welcome back' : 'Create account'}</h1>
+          <p className="auth-subtitle">{authState.isLogin ? 'Sign in to continue chatting' : 'Join Messenger to start connecting'}</p>
         </div>
 
         <div className="auth-form">
           <form onSubmit={handleAuthSubmit} noValidate>
-            <div className={`form-group ${authState.isLogin ? 'hidden' : ''}`}>
-              <label htmlFor="username" className="form-label">
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                className="form-input"
-                placeholder="johndoe"
-                value={authState.username}
-                onChange={handleInputChange('username')}
-                required={!authState.isLogin}
-                disabled={authState.loading}
-                minLength={3}
-              />
-            </div>
+            {!authState.isLogin && (
+              <div className="form-group">
+                <label htmlFor="username" className="form-label">Username</label>
+                <input
+                  type="text"
+                  id="username"
+                  className="form-input"
+                  placeholder="johndoe"
+                  value={authState.username}
+                  onChange={handleInputChange('username')}
+                  required
+                  disabled={authState.loading}
+                  minLength={3}
+                />
+              </div>
+            )}
 
             <div className="form-group">
-              <label htmlFor="email" className="form-label">
-                Email
-              </label>
+              <label htmlFor="email" className="form-label">Email</label>
               <input
                 type="email"
                 id="email"
@@ -290,9 +217,7 @@ export default function AuthPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
+              <label htmlFor="password" className="form-label">Password</label>
               <input
                 type="password"
                 id="password"
@@ -309,38 +234,22 @@ export default function AuthPage() {
 
             {errorMessage && (
               <div className={`message ${errorMessage.includes('Success') ? 'success-message' : 'error-message'}`}>
-                {errorMessage.split('\n').map((line, index) => (
-                  <div key={index}>{line}</div>
-                ))}
+                {errorMessage.split('\n').map((line, index) => <div key={index}>{line}</div>)}
               </div>
             )}
 
-            <button
-              type="submit"
-              className="auth-button"
-              disabled={authState.loading}
-            >
-              {authState.loading ? 'Please wait...' : (authState.isLogin ? 'Sign in' : 'Sign up')}
+            <button type="submit" className="auth-button" disabled={authState.loading}>
+              {authState.loading ? 'Please wait...' : authState.isLogin ? 'Sign in' : 'Sign up'}
             </button>
           </form>
-        
+
           <div className="auth-footer">
-            <button
-              type="button"
-              className="auth-link"
-              onClick={toggleAuthMode}
-              disabled={authState.loading}
-            >
+            <button type="button" className="auth-link" onClick={toggleAuthMode} disabled={authState.loading}>
               {authState.isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
 
-            {/* Add Forgot Password link - only show in login mode */}
             {authState.isLogin && (
-              <a
-                href="/auth/forgot-password"
-                className="forgot-password-link"
-                style={{ marginTop: '10px', display: 'block', color: '#007bff', textDecoration: 'none' }}
-              >
+              <a href="/auth/forgot-password" className="forgot-password-link" style={{ marginTop: '10px', display: 'block', color: '#007bff', textDecoration: 'none' }}>
                 Forgot your password?
               </a>
             )}
@@ -348,5 +257,5 @@ export default function AuthPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
