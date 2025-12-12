@@ -4,8 +4,7 @@ import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import '../auth.css';
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const URL="http://127.0.0.1:8000/api/v1"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 
 interface ResetPasswordState {
@@ -62,12 +61,11 @@ function ResetPasswordContent() {
     setMessage('');
 
     try {
-      // const response = await fetch(`${API_BASE_URL}/users/reset-password`
-      const response = await fetch(`${URL}/users/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/users/reset-password`, {
+      // const response = await fetch(`${URL}/users/reset-password`
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
           token: token,

@@ -3,8 +3,7 @@ import { useState, useEffect } from 'react';
 import './auth.css';
 import { useRouter } from 'next/navigation';
 
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const URL="http://127.0.0.1:8000/api/v1"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface AuthState {
   isLogin: boolean;
@@ -21,8 +20,8 @@ interface User {
   email?: string;
   avatar?: string;
   bio?: string;
-  created_at?: string;
-  updates_at?: string;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 export default function AuthPage() {
@@ -90,28 +89,27 @@ export default function AuthPage() {
 
     try {
       const endpoint = isLogin ? 'users/login' : 'users/register';
-      // const url = `${API_BASE_URL}/${endpoint}`;
-      const url = `${URL}/${endpoint}`;
+      const url = `${API_BASE_URL}/${endpoint}`;
+      // const url = `${URL}/${endpoint}`;
 
       const payload = isLogin
         ? { email, password }
         : { name: username.trim(), username: username.trim().toLowerCase(), email: email.trim(), password };
         console.log('Request payload:', payload) // Debug
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      // const controller = new AbortController()
+      // const timeoutId = setTimeout(() => controller.abort(), 10000)
 
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          "accept": "application/json"
-
+        headers: { 
+          'Content-Type': 'application/json',
          },
         body: JSON.stringify(payload),
-        signal: controller.signal
+        // signal: controller.signal
 
       });
-       clearTimeout(timeoutId)
+      //  clearTimeout(timeoutId)
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -139,7 +137,7 @@ export default function AuthPage() {
         avatar: data.user?.avatar,
         bio: data.user?.bio,
         created_at: data.user?.created_at,
-        updates_at:data.user?.updates_at,
+        updated_at:data.user?.updated_at,
       };
       localStorage.setItem('user', JSON.stringify(userData));
 
@@ -259,3 +257,5 @@ export default function AuthPage() {
     </div>
   );
 }
+
+

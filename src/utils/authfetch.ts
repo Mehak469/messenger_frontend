@@ -3,7 +3,8 @@
 let isRefreshing = false;
 let refreshQueue: ((token: string) => void)[] = [];
 
-// const API = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
 
 // ------------------------------
 // Token Helpers
@@ -34,7 +35,7 @@ async function refreshAccessToken() {
   isRefreshing = true;
 
   try {
-    const res = await fetch(`${URL}/users/refresh`, {
+    const res = await fetch(`${API_BASE_URL}/users/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
