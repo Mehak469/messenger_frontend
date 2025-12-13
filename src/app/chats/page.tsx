@@ -11,7 +11,21 @@ import {
   acceptFriendRequestAPI,
   rejectFriendRequestAPI,
   } from '../../services/friendsapi'
-import { Chat,SelectedUser,SentRequest,Message,Story,Notification,CallState,Friend,AppState } from '../../Types/chats';
+import { Chat,SelectedUser,SentRequest,Message,Story,Notification,CallState,Friend,AppState } from '../../Types/chats'
+import StoriesList from '@/components/chats/StoriesList'
+import MutedStoriesList from '@/components/chats/MutedStoriesList'
+import StoryViewer from '@/components/chats/StoryViewer'
+import ChatItem from '@/components/chats/ChatItem'
+import MessageItem from '@/components/chats/MessageItem'
+import MessageInput from '@/components/chats/MessageInput'
+import SendRequestModal from '@/components/chats/SendRequestModal'
+import RequestsSection from '@/components/chats/RequestsSection'
+import CallInterface from '@/components/chats/CallInterface'
+import ContextMenus from '@/components/chats/ContextMenus'
+import SearchResults from '@/components/chats/SearchResults'
+import NotificationsList from '@/components/chats/NotificationsList'
+import Sidebar from '@/components/chats/Sidebar'
+import ChatHeader from '@/components/chats/ChatHeader'
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_BASE_URL="http://127.0.0.1:8000/api/v1"
@@ -712,7 +726,7 @@ const rejectFriendRequest = async (requestId: string) => {
   // ===== FIXED: Handle Chat Click for Both Active and Archived Chats =====
   const handleChatClick = (chatId: number) => {
     // First search in active chats
-    let chat = state.chats.find(c => c.id === chatId);
+    let chat: Chat | undefined = state.chats.find(c => c.id === chatId);
 
     // If not found in active chats, search in archived chats
     if (!chat) {
@@ -729,10 +743,11 @@ const rejectFriendRequest = async (requestId: string) => {
     }
 
     if (chat) {
+      const selectedChat = chat; // Capture for TypeScript
       setState(prev => ({
         ...prev,
-        activeChat: chat,
-        messages: chat.messages || []
+        activeChat: selectedChat,
+        messages: selectedChat.messages || []
       }));
     }
   };
@@ -1705,6 +1720,7 @@ const rejectFriendRequest = async (requestId: string) => {
 
         const newMsg: Message = {
           id: state.messages.length + 1,
+          text: '',
           content: event.target?.result as string,
           time: currentTime,
           isUser: true,
@@ -1756,6 +1772,7 @@ const rejectFriendRequest = async (requestId: string) => {
       const currentTime = getCurrentTime();
       const newMsg: Message = {
         id: state.messages.length + 1,
+        text: '',
         content: event.target?.result as string,
         time: currentTime,
         isUser: true,
@@ -2028,205 +2045,7 @@ const rejectFriendRequest = async (requestId: string) => {
     );
   };
 
-  // ===== FIXED RENDER FUNCTIONS =====
-
-  const renderMessage = (message: Message) => {
-    if (message.type === 'notification') {
-      return (
-        <div key={message.id} className="theme-change-notification">
-          <span>{message.text}</span>
-          <span className="change-link">{message.time}</span>
-        </div>
-      );
-    } else if (message.type === 'like') {
-      return (
-        <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
-          <div className="like-message">
-            <span className="thumb-emoji">👍</span>
-            <span>Liked a message</span>
-          </div>
-        </div>
-      );
-    } else if (message.type === 'image' || message.type === 'video') {
-      return (
-        <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
-          {message.type === 'image' ? (
-            <div className="media-message">
-              <div className="media-container">
-                <img src={message.content} alt="Shared image" />
-                <div className="media-overlay">
-                  <i className="fas fa-expand"></i>
-                </div>
-              </div>
-              <div className="media-status">
-                <span className="message-time">{message.time}</span>
-                {message.isUser && <i className="fas fa-check-double status-icon read"></i>}
-              </div>
-            </div>
-          ) : (
-            <div className="media-message">
-              <div className="reel-player">
-                <video controls style={{ width: '100%', height: '300px', objectFit: 'cover' }}>
-                  <source src={message.content} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-                <div className="reel-controls">
-                  <button className="play-pause">
-                    <i className="fas fa-play"></i>
-                  </button>
-                  <div className="reel-info">
-                    <span>Video</span>
-                    <span className="reel-duration">0:15</span>
-                  </div>
-                </div>
-              </div>
-              <div className="media-status">
-                <span className="message-time">{message.time}</span>
-                {message.isUser && <i className="fas fa-check-double status-icon read"></i>}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    } else if (message.type === 'voice') {
-      return (
-        <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
-          <div className="voice-message">
-            <div className="voice-player">
-              <button
-                className="play-voice-btn"
-                onClick={() => state.playingVoiceMessage === message.id ? stopVoiceMessage() : playVoiceMessage(message.id, message.voiceUrl!)}
-              >
-                <i className={`fas ${state.playingVoiceMessage === message.id ? 'fa-pause' : 'fa-play'}`}></i>
-              </button>
-              <div className="voice-waveform">
-                <div
-                  className="voice-wave"
-                  style={{
-                    width: state.playingVoiceMessage === message.id ? '100%' : '80%',
-                    animation: state.playingVoiceMessage === message.id ? 'wave 1.5s ease-in-out infinite' : 'none'
-                  }}
-                ></div>
-              </div>
-              <span className="voice-duration">{message.duration}s</span>
-            </div>
-            <div className="media-status">
-              <span className="message-time">{message.time}</span>
-              {message.isUser && <i className="fas fa-check-double status-icon read"></i>}
-            </div>
-          </div>
-        </div>
-      );
-    } else {
-      return (
-        <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
-          <div className={`${message.isUser ? 'sent-message' : 'received-message'} whatsapp-message`}>
-            <p className="message-text">{message.text}</p>
-            <div className="message-meta">
-              <span className="message-time">{message.time}</span>
-              {message.isUser && <i className="fas fa-check-double status-icon read"></i>}
-            </div>
-          </div>
-        </div>
-      );
-    }
-  };
-
-  const renderStories = (stories: Story[]) => {
-    return (
-      <div className="stories-container">
-        {/* Create Story Icon */}
-        <div className="story create-story" onClick={addStory}>
-          <div className="story-avatar create-story-avatar">
-            <div className="grey-circle">
-              <i className="fas fa-plus" style={{ color: '#0084ff', fontSize: '20px' }}></i>
-            </div>
-          </div>
-          <span className="story-name">Create Story</span>
-        </div>
-
-        {/* Your Story - Only show if user has stories */}
-        {yourStory.storyCount > 0 && (
-          <div
-            key={yourStory.id}
-            className={`story ${yourStory.isMyStory ? 'my-story' : ''} ${yourStory.isSeen ? 'seen-story' : ''}`}
-            onClick={() => openStory(yourStory.id)}
-            onContextMenu={(e) => handleStoryRightClick(e, yourStory.id)}
-            onTouchStart={(e) => handleStoryTouchStart(yourStory.id, e)}
-            onTouchEnd={handleStoryTouchEnd}
-          >
-            <div className="story-avatar">
-              <img src={yourStory.avatar} alt={yourStory.name} />
-              {yourStory.storyCount && yourStory.storyCount > 1 && (
-                <div className="story-lines">
-                  {Array.from({ length: yourStory.storyCount }, (_, i) => (
-                    <div key={i} className={`story-line ${i === state.currentStoryItemIndex ? 'active' : ''}`}></div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <span className="story-name">{yourStory.name}</span>
-          </div>
-        )}
-
-        {/* Other Stories */}
-        {stories.filter(story => !story.isMyStory).map(story => (
-          <div
-            key={story.id}
-            className={`story ${story.isMyStory ? 'my-story' : ''} ${story.isSeen ? 'seen-story' : ''}`}
-            onClick={() => openStory(story.id)}
-            onContextMenu={(e) => handleStoryRightClick(e, story.id)}
-            onTouchStart={(e) => handleStoryTouchStart(story.id, e)}
-            onTouchEnd={handleStoryTouchEnd}
-          >
-            <div className="story-avatar">
-              <img src={story.avatar} alt={story.name} />
-              {story.storyCount && story.storyCount > 1 && (
-                <div className="story-lines">
-                  {Array.from({ length: story.storyCount }, (_, i) => (
-                    <div key={i} className={`story-line ${i === 0 ? 'active' : ''}`}></div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <span className="story-name">{story.name}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderMutedStories = (stories: Story[]) => {
-    return (
-      <div className="muted-stories-section">
-        <div className="stories-container">
-          {stories.map(story => (
-            <div
-              key={story.id}
-              className="story muted-story"
-              onClick={() => openStory(story.id)}
-              onContextMenu={(e) => handleStoryRightClick(e, story.id)}
-              onTouchStart={(e) => handleStoryTouchStart(story.id, e)}
-              onTouchEnd={handleStoryTouchEnd}
-            >
-              <div className="story-avatar">
-                <img src={story.avatar} alt={story.name} />
-                <div className="muted-story-indicator">
-                  <i className="fas fa-volume-mute"></i>
-                </div>
-              </div>
-              <span className="story-name">{story.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const normalStories = state.stories.filter(story => !story.isMuted && !story.isMyStory);
-  const mutedStories = state.stories.filter(story => story.isMuted);
-
-  // Get current story for viewer
+  // Helper functions for story navigation
   const getCurrentStory = () => {
     if (state.currentStoryIndex === -1) {
       return yourStory;
@@ -2234,231 +2053,14 @@ const rejectFriendRequest = async (requestId: string) => {
     return state.stories[state.currentStoryIndex];
   };
 
+  const normalStories = state.stories.filter(story => !story.isMuted && !story.isMyStory);
+  const mutedStories = state.stories.filter(story => story.isMuted);
+
   const currentStory = getCurrentStory();
   const isYourStory = state.currentStoryIndex === -1;
   const currentMediaUrl = currentStory?.mediaUrls[state.currentStoryItemIndex];
   const isVideo = currentMediaUrl?.includes('video') || currentStory?.mediaType === 'video';
 
-  // Render Requests Tabs
-  const renderRequestsTabs = () => {
-    return (
-      <div className="requests-tabs">
-        <div className="tabs-header">
-          <button
-            className={`tab-button ${state.requestsActiveTab === 'requests' ? 'active' : ''}`}
-            onClick={() => setRequestsActiveTab('requests')}
-          >
-            Requests
-          </button>
-          <button
-            className={`tab-button ${state.requestsActiveTab === 'pending' ? 'active' : ''}`}
-            onClick={() => setRequestsActiveTab('pending')}
-          >
-            Pending
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Render Requests Content - INCOMING REQUESTS TAB
-// Update the renderRequestsContent function - specifically the Requests tab section
-const renderRequestsContent = () => {
-  if (state.requestsActiveTab === 'requests') {
-    return (
-      <div className="requests-list">
-        {state.receivedRequests.length > 0 ? (
-          state.receivedRequests.map(request => (
-            <div key={request.id} className="request-item">
-              <div className="request-avatar">
-                <img src={request.avatar} alt={request.name} />
-              </div>
-              <div className="request-content">
-                <div className="request-header">
-                  <span className="request-name">{request.name}</span>
-                  <span className="request-time">{request.time}</span>
-                </div>
-                <div className="request-message">
-                  {request.message}
-                </div>
-                <div className="request-actions">
-                  <button 
-                    className="reject-btn" 
-                    onClick={() => rejectFriendRequest(request.id)}
-                  >
-                    Reject
-                  </button>
-                  <button 
-                    className="accept-btn" 
-                    onClick={() => acceptFriendRequest(request.id)}
-                  >
-                    Accept
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-requests">
-            <div className="no-requests-content">
-              <i className="fas fa-user-friends" style={{ fontSize: '48px', color: '#65676B', marginBottom: '16px' }}></i>
-              <h3>No incoming friend requests</h3>
-              <p>When people send you friend requests, they'll appear here.</p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  } else {
-    return (
-      <div className="sent-requests-list">
-        {state.sentRequests.length > 0 ? (
-          state.sentRequests.map(req => (
-            <div key={req.id} className="sent-request-item">
-              <div className="request-avatar">
-                <img src={req.avatar} alt={req.name} />
-              </div>
-
-              <div className="request-content">
-                <div className="request-header">
-                  <span className="request-name">{req.name}</span>
-                  <span className="request-time">{req.time}</span>
-                </div>
-
-                <div className="request-message">
-                  {req.message}
-                </div>
-
-                <div className="sent-request-actions">
-                  {/* REMOVED: <span className="status-badge pending">Pending</span> */}
-                  <button 
-                    className="cancel-request-btn" 
-                    onClick={() => cancelSentRequest(req.id)}
-                  >
-                    <i className="fas fa-times"></i> Cancel Request
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-sent-requests">
-            <div className="no-sent-requests-content">
-              <i className="fas fa-paper-plane" style={{ fontSize: '48px', color: '#65676B', marginBottom: '16px' }}></i>
-              <h3>No sent requests</h3>
-              <p>You haven't sent any friend requests yet. Search for friends to send requests.</p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-};
-  // ===== FIXED: Render Search Results for Chats =====
-  const renderSearchResults = () => {
-    if (!state.searchQuery.trim()) return null;
-
-    return (
-      <div className="search-results">
-        {state.searchResults.length > 0 ?
-          state.searchResults.map((result, index) => {
-            // For chats section
-            if (state.activeSection === 'chats') {
-              const chat = result as Chat;
-              return (
-                <div
-                  key={chat.id}
-                  className={`search-result-item ${state.isMobile ? 'mobile-chat-item' : 'chat-item'}`}
-                  onClick={() => handleChatClick(chat.id)}
-                >
-                  {/* ... existing chat rendering code ... */}
-                </div>
-              );
-            }
-
-            // For requests section - UPDATED FOR API RESULTS
-            else if (state.activeSection === 'requests') {
-              const user = result;
-              const isConnected = state.chats.some(chat =>
-                chat.name.toLowerCase() === user.name.toLowerCase()
-              );
-
-              return (
-                <div key={user.id} className="search-result-item">
-                  <div className={`chat-item ${state.isMobile ? 'mobile-chat-item' : ''}`}>
-                    <div className={`${state.isMobile ? 'mobile-chat-avatar' : 'chat-avatar'}`}>
-                      <img src={user.avatar} alt={user.name} />
-                    </div>
-                    <div className={`${state.isMobile ? 'mobile-chat-info' : 'chat-content'}`}>
-                      <div className={`${state.isMobile ? 'mobile-chat-header' : 'chat-header'}`}>
-                        <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>
-                          {user.name}
-                          {user.username && (
-                            <span className="username" style={{ fontSize: '12px', color: '#65676B', marginLeft: '8px' }}>
-                              @{user.username}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <div className={`${state.isMobile ? 'mobile-chat-preview' : 'chat-preview'}`}>
-                        <span>
-                          {isConnected
-                            ? "Already connected"
-                            : user.bio || "Click to send friend request"
-                          }
-                          {user.friends && user.friends.length > 0 && (
-                            <span style={{ fontSize: '11px', color: '#1877f2', marginLeft: '8px' }}>
-                              {user.friends.length} friends
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    {!isConnected && (
-                      <button
-                        className="send-request-btn"
-                        onClick={() => openSendRequestModal(user)}
-                      >
-                        Send Request
-                      </button>
-                    )}
-                    {isConnected && (
-                      <button
-                        className="send-request-btn connected-btn"
-                        style={{ backgroundColor: '#e4e6eb', color: '#65676B' }}
-                        disabled
-                      >
-                        Connected
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            // For other sections
-            else {
-              return (
-                <div key={index} className="search-result-item">
-                  <div className="chat-item">
-                    <div className="chat-content">
-                      <div className="chat-header">
-                        <span className="chat-name">{result.name || result.title}</span>
-                      </div>
-                      <div className="chat-preview">
-                        <span>{result.lastMessage || result.description}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-          }) :
-          <div className="no-results">No results found for "{state.searchQuery}"</div>
-        }
-      </div>
-    );
-  };
 
   // Don't render anything until client-side to avoid hydration mismatch
   if (!isClient) {
@@ -2494,27 +2096,12 @@ const renderRequestsContent = () => {
 
           {/* Mobile Chat Header - Only shown in chat view */}
           {state.activeChat && (
-            <div className="mobile-chat-header">
-              <div className="mobile-chat-header-content">
-                <button className="mobile-back-btn" onClick={() => setState(prev => ({ ...prev, activeChat: null }))}>
-                  <i className="fas fa-arrow-left"></i>
-                </button>
-                <div className="mobile-chat-user">
-                  <div className="mobile-chat-avatar">
-                    <img src={state.activeChat.avatar} alt={state.activeChat.name} />
-                    {state.activeChat.isOnline && <div className="online-indicator"></div>}
-                  </div>
-                  <div className="mobile-chat-info">
-                    <span className="mobile-chat-name">{state.activeChat.name}</span>
-                    <span className="mobile-chat-status">{state.activeChat.isOnline ? 'Active now' : 'Offline'}</span>
-                  </div>
-                </div>
-                <div className="mobile-chat-actions">
-                  <i className="fas fa-video"></i>
-                  <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
-                </div>
-              </div>
-            </div>
+            <ChatHeader
+              chat={state.activeChat}
+              isMobile={true}
+              onStartCall={startOutgoingCall}
+              onBack={() => setState(prev => ({ ...prev, activeChat: null }))}
+            />
           )}
 
           {/* Mobile Content Area */}
@@ -2532,103 +2119,40 @@ const renderRequestsContent = () => {
                       Messages and calls are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
                     </div>
                   ) : (
-                    state.messages.map(message => renderMessage(message))
+                    state.messages.map(message => (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        playingVoiceMessage={state.playingVoiceMessage}
+                        onPlayVoiceMessage={playVoiceMessage}
+                        onStopVoiceMessage={stopVoiceMessage}
+                      />
+                    ))
                   )}
                 </div>
 
                 {/* FIXED BOTTOM MESSAGE INPUT */}
                 <div className="mobile-message-input-container">
                   <div className="mobile-message-input">
-                    <div className="input-container">
-                      <i
-                        className="fas fa-microphone"
-                        id="microphoneButton"
-                        onClick={handleMicrophoneClick}
-                      ></i>
-                      <i
-                        className="fas fa-paperclip"
-                        id="attachButton"
-                        onClick={toggleAttachmentMenu}
-                      ></i>
-                      <input
-                        type="text"
-                        id="messageInput"
-                        placeholder="Type a message"
-                        value={state.newMessage}
-                        onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
-                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                      />
-                      <div className="input-actions">
-                        <i
-                          className="fas fa-smile"
-                          id="emojiButton"
-                          onClick={toggleEmojiPicker}
-                        ></i>
-                        <i
-                          className="fas fa-thumbs-up"
-                          id="likeButton"
-                          onClick={sendThumbEmoji}
-                        ></i>
-                      </div>
-                    </div>
-
-                    {/* Recording Indicator */}
-                    {state.isRecording && (
-                      <div className="recording-indicator">
-                        <div className="recording-pulse"></div>
-                        <span className="recording-text">Recording... {formatCallDuration(state.recordingTime)}</span>
-                        <button className="stop-recording-btn" onClick={stopRecording}>
-                          <i className="fas fa-stop"></i>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Emoji Picker */}
-                    {state.showEmojiPicker && (
-                      <div className="emoji-picker active">
-                        {popularEmojis.map((emoji, index) => (
-                          <div
-                            key={index}
-                            className="emoji-option"
-                            onClick={() => addEmoji(emoji)}
-                          >
-                            {emoji}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Attachment Menu */}
-                    {state.showAttachmentMenu && (
-                      <div className="attachment-menu active">
-                        <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
-                          <i className="fas fa-image"></i>
-                          <span>Photo</span>
-                          <input
-                            id="photoInput"
-                            type="file"
-                            className="file-input"
-                            accept="image/*"
-                            onChange={(e) => handleFileUpload(e, 'image')}
-                          />
-                        </div>
-                        <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
-                          <i className="fas fa-film"></i>
-                          <span>Video</span>
-                          <input
-                            id="videoInput"
-                            type="file"
-                            className="file-input"
-                            accept="video/*"
-                            onChange={(e) => handleFileUpload(e, 'video')}
-                          />
-                        </div>
-                        <div className="attachment-option" onClick={openCamera}>
-                          <i className="fas fa-camera"></i>
-                          <span>Camera</span>
-                        </div>
-                      </div>
-                    )}
+                    <MessageInput
+                      newMessage={state.newMessage}
+                      isRecording={state.isRecording}
+                      recordingTime={state.recordingTime}
+                      showEmojiPicker={state.showEmojiPicker}
+                      showAttachmentMenu={state.showAttachmentMenu}
+                      onMessageChange={(message) => setState(prev => ({ ...prev, newMessage: message }))}
+                      onSendMessage={sendMessage}
+                      onSendThumbEmoji={sendThumbEmoji}
+                      onToggleEmojiPicker={toggleEmojiPicker}
+                      onToggleAttachmentMenu={toggleAttachmentMenu}
+                      onMicrophoneClick={handleMicrophoneClick}
+                      onStopRecording={stopRecording}
+                      onAddEmoji={addEmoji}
+                      onFileUpload={handleFileUpload}
+                      onOpenCamera={openCamera}
+                      formatCallDuration={formatCallDuration}
+                      popularEmojis={popularEmojis}
+                    />
                   </div>
                 </div>
               </div>
@@ -2664,117 +2188,98 @@ const renderRequestsContent = () => {
                         </button>
                       )}
                     </div>
-                    {!state.showMutedStories ? renderStories(normalStories) : renderMutedStories(mutedStories)}
+                    {!state.showMutedStories ? (
+                      <StoriesList
+                        stories={normalStories}
+                        yourStory={yourStory}
+                        currentStoryItemIndex={state.currentStoryItemIndex}
+                        onStoryClick={openStory}
+                        onStoryRightClick={handleStoryRightClick}
+                        onStoryTouchStart={handleStoryTouchStart}
+                        onStoryTouchEnd={handleStoryTouchEnd}
+                        onAddStory={addStory}
+                      />
+                    ) : (
+                      <MutedStoriesList
+                        stories={mutedStories}
+                        onStoryClick={openStory}
+                        onStoryRightClick={handleStoryRightClick}
+                        onStoryTouchStart={handleStoryTouchStart}
+                        onStoryTouchEnd={handleStoryTouchEnd}
+                      />
+                    )}
                   </div>
                 )}
 
                 {/* Content based on active section */}
                 <div className="mobile-section-content">
                   {state.searchQuery ? (
-                    renderSearchResults()
+                    <SearchResults
+                      searchQuery={state.searchQuery}
+                      searchResults={state.searchResults}
+                      activeSection={state.activeSection}
+                      isMobile={state.isMobile}
+                      chats={state.chats}
+                      onChatClick={handleChatClick}
+                      onOpenSendRequestModal={openSendRequestModal}
+                    />
                   ) : (
                     <>
                       {/* Chats List - FIXED FOR MOBILE WITH NAMES AND TIMESTAMPS */}
                       {state.activeSection === 'chats' && (
                         <div className="mobile-chats-list">
                           {state.chats.map(chat => (
-                            <div
+                            <ChatItem
                               key={chat.id}
-                              className="mobile-chat-item"
-                              data-chat-id={chat.id}
-                              onClick={() => !state.contextMenu.visible && handleChatClick(chat.id)}
-                              onContextMenu={(e) => handleChatRightClick(e, chat.id, 'chat')}
-                              onTouchStart={(e) => handleChatTouchStart(chat.id, 'chat', e)}
-                              onTouchEnd={handleChatTouchEnd}
-                            >
-                              <div className="mobile-chat-avatar">
-                                <img src={chat.avatar} alt={chat.name} />
-                                {chat.isOnline && <div className="mobile-online-indicator"></div>}
-                              </div>
-                              <div className="mobile-chat-info">
-                                <div className="mobile-chat-header">
-                                  <span className="mobile-chat-name">{chat.name}</span>
-                                  <span className="mobile-chat-time">{chat.time}</span>
-                                </div>
-                                <div className="mobile-chat-preview">
-                                  <span className="mobile-last-message">{chat.lastMessage}</span>
-                                  {chat.unread > 0 && <span className="mobile-unread-badge">{chat.unread}</span>}
-                                </div>
-                              </div>
-                            </div>
+                              chat={chat}
+                              isActive={false}
+                              isMobile={true}
+                              onChatClick={handleChatClick}
+                              onChatRightClick={handleChatRightClick}
+                              onChatTouchStart={handleChatTouchStart}
+                              onChatTouchEnd={handleChatTouchEnd}
+                              type="chat"
+                            />
                           ))}
                         </div>
                       )}
 
                       {/* Notifications List */}
                       {state.activeSection === 'notifications' && (
-                        <div className="notifications-list">
-                          {state.notifications.map(notification => (
-                            <div
-                              key={notification.id}
-                              className="notification-item"
-                              onClick={() => markNotificationAsRead(notification.id)}
-                            >
-                              <div className="notification-avatar">
-                                {notification.userAvatar ? (
-                                  <img src={notification.userAvatar} alt={notification.title} />
-                                ) : notification.pageAvatar ? (
-                                  <img src={notification.pageAvatar} alt={notification.title} />
-                                ) : (
-                                  <div className="system-avatar">
-                                    <i className="fas fa-bell"></i>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="notification-content">
-                                <div className="notification-header">
-                                  <span className="notification-title">{notification.title}</span>
-                                  <span className="notification-time">{notification.time}</span>
-                                </div>
-                                <div className="notification-description">
-                                  {notification.description}
-                                </div>
-                              </div>
-                              {notification.isNew && <div className="new-notification-indicator"></div>}
-                            </div>
-                          ))}
-                        </div>
+                        <NotificationsList
+                          notifications={state.notifications}
+                          onMarkAsRead={markNotificationAsRead}
+                        />
                       )}
 
                       {/* Requests Section */}
                       {state.activeSection === 'requests' && (
-                        <div className="requests-section">
-                          {renderRequestsTabs()}
-                          {renderRequestsContent()}
-                        </div>
+                        <RequestsSection
+                          activeTab={state.requestsActiveTab}
+                          receivedRequests={state.receivedRequests}
+                          sentRequests={state.sentRequests}
+                          onTabChange={setRequestsActiveTab}
+                          onAcceptRequest={acceptFriendRequest}
+                          onRejectRequest={rejectFriendRequest}
+                          onCancelRequest={cancelSentRequest}
+                        />
                       )}
 
                       {/* ===== FIXED: Archived Section with Working Chat Opening ===== */}
                       {state.activeSection === 'archived' && (
                         <div className="archived-list">
                           {state.archivedChats.map(chat => (
-                            <div
+                            <ChatItem
                               key={chat.id}
-                              className="archived-item"
-                              data-chat-id={chat.id}
-                              onClick={() => !state.contextMenu.visible && handleChatClick(chat.id)}
-                              onContextMenu={(e) => handleChatRightClick(e, chat.id, 'archived')}
-                              onTouchStart={(e) => handleChatTouchStart(chat.id, 'archived', e)}
-                              onTouchEnd={handleChatTouchEnd}
-                            >
-                              <div className="archived-avatar">
-                                <img src={chat.avatar} alt={chat.name} />
-                              </div>
-                              <div className="archived-content">
-                                <div className="archived-header">
-                                  <span className="archived-name">{chat.name}</span>
-                                  <span className="archived-time">{chat.time}</span>
-                                </div>
-                                <div className="archived-preview">
-                                  <span className="archived-preview-text">{chat.lastMessage}</span>
-                                </div>
-                              </div>
-                            </div>
+                              chat={chat}
+                              isActive={false}
+                              isMobile={state.isMobile}
+                              onChatClick={handleChatClick}
+                              onChatRightClick={handleChatRightClick}
+                              onChatTouchStart={handleChatTouchStart}
+                              onChatTouchEnd={handleChatTouchEnd}
+                              type="archived"
+                            />
                           ))}
                         </div>
                       )}
@@ -2833,48 +2338,13 @@ const renderRequestsContent = () => {
       {!state.isMobile && (
         <div className="desktop-layout">
           {/* Left Sidebar Icons */}
-          <div className="left-sidebar">
-            <div className="sidebar-icons">
-              <div
-                className={`icon-item ${state.activeSection === 'chats' ? 'active' : ''}`}
-                onClick={() => setActiveSection('chats')}
-              >
-                <i className="fas fa-comment"></i>
-                <div className="icon-tooltip">Chats</div>
-              </div>
-              <div
-                className={`icon-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
-                onClick={() => setActiveSection('notifications')}
-              >
-                <i className="fas fa-bell"></i>
-                <div className="icon-tooltip">Notifications</div>
-                {state.notifications.some(n => n.isNew) && (
-                  <div className="notification-indicator"></div>
-                )}
-              </div>
-              <div
-                className={`icon-item ${state.activeSection === 'requests' ? 'active' : ''}`}
-                onClick={() => setActiveSection('requests')}
-              >
-                <i className="fas fa-user-friends"></i>
-                <div className="icon-tooltip">Message Requests</div>
-                {state.messageRequests.length > 0 && (
-                  <div className="notification-indicator"></div>
-                )}
-              </div>
-              <div
-                className={`icon-item ${state.activeSection === 'archived' ? 'active' : ''}`}
-                onClick={() => setActiveSection('archived')}
-              >
-                <i className="fas fa-archive"></i>
-                <div className="icon-tooltip">Archived Chats</div>
-              </div>
-              <div className="icon-item profile-icon" onClick={() => window.location.href = '/profile'}>
-                <img src={profileAvatar} alt="Profile" />
-                <div className="icon-tooltip">Profile</div>
-              </div>
-            </div>
-          </div>
+          <Sidebar
+            activeSection={state.activeSection}
+            profileAvatar={profileAvatar}
+            notifications={state.notifications}
+            messageRequests={state.messageRequests}
+            onSectionChange={setActiveSection}
+          />
 
           {/* Chats/Notifications/Requests/Archived Sidebar */}
           <div className="chats-sidebar">
@@ -2905,7 +2375,15 @@ const renderRequestsContent = () => {
             {/* Section Content */}
             <div className="section-content">
               {state.searchQuery ? (
-                renderSearchResults()
+                <SearchResults
+                  searchQuery={state.searchQuery}
+                  searchResults={state.searchResults}
+                  activeSection={state.activeSection}
+                  isMobile={state.isMobile}
+                  chats={state.chats}
+                  onChatClick={handleChatClick}
+                  onOpenSendRequestModal={openSendRequestModal}
+                />
               ) : (
                 <>
                   {/* Stories Section */}
@@ -2924,7 +2402,26 @@ const renderRequestsContent = () => {
                           </button>
                         )}
                       </div>
-                      {!state.showMutedStories ? renderStories(normalStories) : renderMutedStories(mutedStories)}
+                      {!state.showMutedStories ? (
+                        <StoriesList
+                          stories={normalStories}
+                          yourStory={yourStory}
+                          currentStoryItemIndex={state.currentStoryItemIndex}
+                          onStoryClick={openStory}
+                          onStoryRightClick={handleStoryRightClick}
+                          onStoryTouchStart={handleStoryTouchStart}
+                          onStoryTouchEnd={handleStoryTouchEnd}
+                          onAddStory={addStory}
+                        />
+                      ) : (
+                        <MutedStoriesList
+                          stories={mutedStories}
+                          onStoryClick={openStory}
+                          onStoryRightClick={handleStoryRightClick}
+                          onStoryTouchStart={handleStoryTouchStart}
+                          onStoryTouchEnd={handleStoryTouchEnd}
+                        />
+                      )}
                     </div>
                   )}
 
@@ -2933,27 +2430,17 @@ const renderRequestsContent = () => {
                     <div className="chats-section">
                       <div className="chats-list">
                         {state.chats.map(chat => (
-                          <div
+                          <ChatItem
                             key={chat.id}
-                            className={`chat-item ${chat.id === state.activeChat?.id ? 'active' : ''}`}
-                            onClick={() => handleChatClick(chat.id)}
-                            onContextMenu={(e) => handleChatRightClick(e, chat.id, 'chat')}
-                          >
-                            <div className="chat-avatar">
-                              <img src={chat.avatar} alt={chat.name} />
-                              {chat.isOnline && <div className="online-indicator"></div>}
-                            </div>
-                            <div className="chat-content">
-                              <div className="chat-header">
-                                <span className="chat-name">{chat.name}</span>
-                                <span className="chat-time">{chat.time}</span>
-                              </div>
-                              <div className="chat-preview">
-                                <span className="chat-preview-text">{chat.lastMessage || 'No messages yet'}</span>
-                                {chat.unread > 0 && <span className="unread-badge">{chat.unread}</span>}
-                              </div>
-                            </div>
-                          </div>
+                            chat={chat}
+                            isActive={chat.id === state.activeChat?.id}
+                            isMobile={false}
+                            onChatClick={handleChatClick}
+                            onChatRightClick={handleChatRightClick}
+                            onChatTouchStart={handleChatTouchStart}
+                            onChatTouchEnd={handleChatTouchEnd}
+                            type="chat"
+                          />
                         ))}
                       </div>
                     </div>
@@ -2962,46 +2449,24 @@ const renderRequestsContent = () => {
                   {/* Notifications List */}
                   {state.activeSection === 'notifications' && (
                     <div className="notifications-section">
-                      <div className="notifications-list">
-                        {state.notifications.map(notification => (
-                          <div
-                            key={notification.id}
-                            className={`notification-item ${notification.isNew ? 'new' : ''}`}
-                            onClick={() => markNotificationAsRead(notification.id)}
-                          >
-                            <div className="notification-avatar">
-                              {notification.userAvatar ? (
-                                <img src={notification.userAvatar} alt={notification.title} />
-                              ) : notification.pageAvatar ? (
-                                <img src={notification.pageAvatar} alt={notification.title} />
-                              ) : (
-                                <div className="system-avatar">
-                                  <i className="fas fa-bell"></i>
-                                </div>
-                              )}
-                            </div>
-                            <div className="notification-content">
-                              <div className="notification-header">
-                                <span className="notification-title">{notification.title}</span>
-                                <span className="notification-time">{notification.time}</span>
-                              </div>
-                              <div className="notification-description">
-                                {notification.description}
-                              </div>
-                            </div>
-                            {notification.isNew && <div className="new-notification-indicator"></div>}
-                          </div>
-                        ))}
-                      </div>
+                      <NotificationsList
+                        notifications={state.notifications}
+                        onMarkAsRead={markNotificationAsRead}
+                      />
                     </div>
                   )}
 
                   {/* Requests Section */}
                   {state.activeSection === 'requests' && (
-                    <div className="requests-section">
-                      {renderRequestsTabs()}
-                      {renderRequestsContent()}
-                    </div>
+                    <RequestsSection
+                      activeTab={state.requestsActiveTab}
+                      receivedRequests={state.receivedRequests}
+                      sentRequests={state.sentRequests}
+                      onTabChange={setRequestsActiveTab}
+                      onAcceptRequest={acceptFriendRequest}
+                      onRejectRequest={rejectFriendRequest}
+                      onCancelRequest={cancelSentRequest}
+                    />
                   )}
 
                   {/* ===== FIXED: Archived Section with Working Chat Opening ===== */}
@@ -3009,25 +2474,17 @@ const renderRequestsContent = () => {
                     <div className="archived-section">
                       <div className="archived-list">
                         {state.archivedChats.map(chat => (
-                          <div
+                          <ChatItem
                             key={chat.id}
-                            className="archived-item"
-                            onClick={() => handleChatClick(chat.id)}
-                            onContextMenu={(e) => handleChatRightClick(e, chat.id, 'archived')}
-                          >
-                            <div className="archived-avatar">
-                              <img src={chat.avatar} alt={chat.name} />
-                            </div>
-                            <div className="archived-content">
-                              <div className="archived-header">
-                                <span className="archived-name">{chat.name}</span>
-                                <span className="archived-time">{chat.time}</span>
-                              </div>
-                              <div className="archived-preview">
-                                <span className="archived-preview-text">{chat.lastMessage}</span>
-                              </div>
-                            </div>
-                          </div>
+                            chat={chat}
+                            isActive={false}
+                            isMobile={false}
+                            onChatClick={handleChatClick}
+                            onChatRightClick={handleChatRightClick}
+                            onChatTouchStart={handleChatTouchStart}
+                            onChatTouchEnd={handleChatTouchEnd}
+                            type="archived"
+                          />
                         ))}
                       </div>
                     </div>
@@ -3041,24 +2498,11 @@ const renderRequestsContent = () => {
           <div className="main-chat">
             {state.activeChat ? (
               <div className="chat-window">
-                <div className="chat-header">
-                  <div className="chat-user">
-                    <div className="user-avatar">
-                      <img src={state.activeChat.avatar} alt={state.activeChat.name} />
-                      {state.activeChat.isOnline && <div className="online-indicator"></div>}
-                    </div>
-                    <div className="user-info">
-                      <span className="user-name">{state.activeChat.name}</span>
-                      <span className={`user-status ${state.activeChat.isOnline ? 'online' : 'offline'}`}>
-                        {state.activeChat.isOnline ? 'Active now' : 'Offline'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="chat-actions">
-                    <i className="fas fa-video"></i>
-                    <i className="fas fa-phone" onClick={() => startOutgoingCall(state.activeChat!)}></i>
-                  </div>
-                </div>
+                <ChatHeader
+                  chat={state.activeChat}
+                  isMobile={false}
+                  onStartCall={startOutgoingCall}
+                />
 
                 <div className="messages-container">
                   <div className="date-separator">
@@ -3070,102 +2514,37 @@ const renderRequestsContent = () => {
                       Messages and calls are end-to-end encrypted. No one outside of this chat, not even Messenger, can read or listen to them.
                     </div>
                   ) : (
-                    state.messages.map(message => renderMessage(message))
+                    state.messages.map(message => (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        playingVoiceMessage={state.playingVoiceMessage}
+                        onPlayVoiceMessage={playVoiceMessage}
+                        onStopVoiceMessage={stopVoiceMessage}
+                      />
+                    ))
                   )}
                 </div>
 
-                <div className="message-input">
-                  <div className="input-container">
-                    <i
-                      className="fas fa-microphone"
-                      id="microphoneButton"
-                      onClick={handleMicrophoneClick}
-                    ></i>
-                    <i
-                      className="fas fa-paperclip"
-                      id="attachButton"
-                      onClick={toggleAttachmentMenu}
-                    ></i>
-                    <input
-                      type="text"
-                      id="messageInput"
-                      placeholder="Type a message"
-                      value={state.newMessage}
-                      onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    />
-                    <div className="input-actions">
-                      <i
-                        className="fas fa-smile"
-                        id="emojiButton"
-                        onClick={toggleEmojiPicker}
-                      ></i>
-                      <i
-                        className="fas fa-thumbs-up"
-                        id="likeButton"
-                        onClick={sendThumbEmoji}
-                      ></i>
-                    </div>
-                  </div>
-
-                  {/* Recording Indicator */}
-                  {state.isRecording && (
-                    <div className="recording-indicator">
-                      <div className="recording-pulse"></div>
-                      <span className="recording-text">Recording... {formatCallDuration(state.recordingTime)}</span>
-                      <button className="stop-recording-btn" onClick={stopRecording}>
-                        <i className="fas fa-stop"></i>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Emoji Picker */}
-                  {state.showEmojiPicker && (
-                    <div className="emoji-picker active">
-                      {popularEmojis.map((emoji, index) => (
-                        <div
-                          key={index}
-                          className="emoji-option"
-                          onClick={() => addEmoji(emoji)}
-                        >
-                          {emoji}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Attachment Menu */}
-                  {state.showAttachmentMenu && (
-                    <div className="attachment-menu active">
-                      <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
-                        <i className="fas fa-image"></i>
-                        <span>Photo</span>
-                        <input
-                          id="photoInput"
-                          type="file"
-                          className="file-input"
-                          accept="image/*"
-                          onChange={(e) => handleFileUpload(e, 'image')}
-                        />
-                      </div>
-                      <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
-                        <i className="fas fa-film"></i>
-                        <span>Video</span>
-                        <input
-                          id="videoInput"
-                          type="file"
-                          className="file-input"
-                          accept="video/*"
-                          onChange={(e) => handleFileUpload(e, 'video')}
-                        />
-                      </div>
-                      <div className="attachment-option" onClick={openCamera}>
-                        <i className="fas fa-camera"></i>
-                        <span>Camera</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <MessageInput
+                  newMessage={state.newMessage}
+                  isRecording={state.isRecording}
+                  recordingTime={state.recordingTime}
+                  showEmojiPicker={state.showEmojiPicker}
+                  showAttachmentMenu={state.showAttachmentMenu}
+                  onMessageChange={(message) => setState(prev => ({ ...prev, newMessage: message }))}
+                  onSendMessage={sendMessage}
+                  onSendThumbEmoji={sendThumbEmoji}
+                  onToggleEmojiPicker={toggleEmojiPicker}
+                  onToggleAttachmentMenu={toggleAttachmentMenu}
+                  onMicrophoneClick={handleMicrophoneClick}
+                  onStopRecording={stopRecording}
+                  onAddEmoji={addEmoji}
+                  onFileUpload={handleFileUpload}
+                  onOpenCamera={openCamera}
+                  formatCallDuration={formatCallDuration}
+                  popularEmojis={popularEmojis}
+                />
               </div>
             ) : (
               <div className="chat-placeholder">
@@ -3182,335 +2561,75 @@ const renderRequestsContent = () => {
       )}
 
       {/* Send Request Modal */}
-      {state.showSendRequestModal && (
-        <div className="modal-overlay">
-          <div className="send-request-modal">
-            <div className="modal-header">
-              <div className="modal-user-info">
-                <div className="sender-avatar">
-                  <img src={profileAvatar} alt="You" />
-                </div>
-                <div className="friendship-icon">
-                  <i className="fas fa-handshake"></i>
-                </div>
-                <div className="receiver-avatar">
-                  <img src={state.selectedUserForRequest?.avatar} alt={state.selectedUserForRequest?.name} />
-                </div>
-              </div>
-              <button className="close-modal" onClick={closeSendRequestModal}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="request-chat-box">
-                <textarea
-                  placeholder="Type a message to send with your friend request..."
-                  value={state.requestMessage}
-                  onChange={(e) => setState(prev => ({ ...prev, requestMessage: e.target.value }))}
-                />
-              </div>
-              <button
-                className="send-request-button"
-                onClick={sendFriendRequest}
-                disabled={state.isSendingRequest || !state.requestMessage.trim()}
-              >
-                {state.isSendingRequest ? (
-                  <>
-                    <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
-                    Sending...
-                  </>
-                ) : (
-                  'Send Request'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SendRequestModal
+        isOpen={state.showSendRequestModal}
+        profileAvatar={profileAvatar}
+        selectedUser={state.selectedUserForRequest}
+        requestMessage={state.requestMessage}
+        isSendingRequest={state.isSendingRequest}
+        onClose={closeSendRequestModal}
+        onMessageChange={(message) => setState(prev => ({ ...prev, requestMessage: message }))}
+        onSendRequest={sendFriendRequest}
+      />
 
       {/* Stories Viewer */}
       {state.showStoriesViewer && currentStory && currentStory.mediaUrls.length > 0 && (
-        <div className="stories-viewer" onClick={closeStory}>
-          <div className="story-content" onClick={(e) => e.stopPropagation()}>
-            {/* Progress Bars */}
-            <div className="story-progress">
-              {Array.from({ length: currentStory.storyCount }, (_, i) => (
-                <div key={i} className="progress-segment">
-                  <div
-                    className={`progress-fill ${i === state.currentStoryItemIndex ? 'active' : i < state.currentStoryItemIndex ? 'completed' : ''}`}
-                    style={{
-                      width: i === state.currentStoryItemIndex ? `${state.storyProgress}%` :
-                        i < state.currentStoryItemIndex ? '100%' : '0%'
-                    }}
-                  ></div>
-                </div>
-              ))}
-            </div>
-
-            {/* Story Header */}
-            <div className="story-header">
-              <img
-                src={currentStory.avatar}
-                alt=""
-                className="story-header-avatar"
-              />
-              <div className="story-header-info">
-                <div className="story-user-name">{currentStory.name}</div>
-                <div className="story-time">{currentStory.time}</div>
-              </div>
-              <div className="story-controls">
-                <button className="story-play-pause" onClick={toggleStoryPlayPause}>
-                  <i className={`fas ${state.isStoryPlaying ? 'fa-pause' : 'fa-play'}`}></i>
-                </button>
-                <button className="story-close" onClick={closeStory}>
-                  <i className="fas fa-times"></i>
-                </button>
-              </div>
-            </div>
-
-            {/* Navigation Arrows */}
-            {!isYourStory && state.currentStoryIndex > 0 && (
-              <button className="story-nav story-prev" onClick={prevStory}>
-                <i className="fas fa-chevron-left"></i>
-              </button>
-            )}
-            {!isYourStory && state.currentStoryIndex < state.stories.length - 1 && (
-              <button className="story-nav story-next" onClick={nextStory}>
-                <i className="fas fa-chevron-right"></i>
-              </button>
-            )}
-
-            {/* Story Media */}
-            <div className="story-media">
-              {isVideo ? (
-                <video
-                  ref={videoRef}
-                  src={currentMediaUrl}
-                  autoPlay
-                  muted={false}
-                  loop={false}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  onEnded={nextStoryItem}
-                />
-              ) : (
-                <img
-                  src={currentMediaUrl}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              )}
-            </div>
-
-            {/* Story Caption */}
-            {currentStory.captions[state.currentStoryItemIndex] && (
-              <div className="story-caption">
-                {currentStory.captions[state.currentStoryItemIndex]}
-              </div>
-            )}
-
-            {/* Story Message Box - Only show for other people's stories */}
-            {!isYourStory && (
-              <>
-                {state.showStoryMessageBox ? (
-                  <div className="story-message-box">
-                    <input
-                      type="text"
-                      className="story-message-input"
-                      placeholder="Send message..."
-                      value={state.storyMessage}
-                      onChange={(e) => setState(prev => ({ ...prev, storyMessage: e.target.value }))}
-                      onKeyPress={(e) => e.key === 'Enter' && handleStoryMessageSend()}
-                      autoFocus
-                    />
-                  </div>
-                ) : (
-                  <button className="story-message-btn" onClick={toggleStoryMessageBox}>
-                    <i className="fas fa-comment" style={{ marginRight: '8px' }}></i>
-                    Send Message
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* Delete Story Option for Your Story */}
-            {isYourStory && (
-              <button
-                className="delete-story-btn"
-                onClick={() => deleteStory(yourStory.id)}
-                style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  right: '20px',
-                  background: 'rgba(255, 0, 0, 0.7)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '20px',
-                  padding: '10px 20px',
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <i className="fas fa-trash" style={{ marginRight: '8px' }}></i>
-                Delete Story
-              </button>
-            )}
-          </div>
-        </div>
+        <StoryViewer
+          currentStory={currentStory}
+          currentStoryItemIndex={state.currentStoryItemIndex}
+          currentStoryIndex={state.currentStoryIndex}
+          storiesLength={state.stories.length}
+          storyProgress={state.storyProgress}
+          isStoryPlaying={state.isStoryPlaying}
+          isYourStory={isYourStory}
+          onClose={closeStory}
+          onTogglePlayPause={toggleStoryPlayPause}
+          onNextStory={nextStory}
+          onPrevStory={prevStory}
+          onNextStoryItem={nextStoryItem}
+          onPrevStoryItem={prevStoryItem}
+          showStoryMessageBox={state.showStoryMessageBox}
+          storyMessage={state.storyMessage}
+          onStoryMessageChange={(message) => setState(prev => ({ ...prev, storyMessage: message }))}
+          onStoryMessageSend={handleStoryMessageSend}
+          onToggleStoryMessageBox={toggleStoryMessageBox}
+          onDeleteStory={deleteStory}
+          videoRef={videoRef}
+        />
       )}
 
       {/* Context Menus */}
-      {/* Chat Context Menu */}
-      {state.contextMenu.visible && (
-        <div
-          className={`chat-context-menu ${state.contextMenu.visible ? 'active' : ''}`}
-          style={{
-            position: 'fixed',
-            left: Math.min(state.contextMenu.x, window.innerWidth - 200),
-            top: Math.min(state.contextMenu.y, window.innerHeight - 200),
-            zIndex: 1000
-          }}
-        >
-          {state.contextMenu.type === 'chat' && (
-            <>
-              <div className="context-menu-item" onClick={handleDeleteFromContextMenu}>
-                <i className="fas fa-trash"></i>
-                <span>Delete Chat</span>
-              </div>
-              <div className="context-menu-item" onClick={handleArchiveFromContextMenu}>
-                <i className="fas fa-archive"></i>
-                <span>Archive Chat</span>
-              </div>
-              <div className="context-menu-item">
-                <i className="fas fa-bell-slash"></i>
-                <span>Mute Notifications</span>
-              </div>
-            </>
-          )}
-          {state.contextMenu.type === 'archived' && (
-            <>
-              <div className="context-menu-item" onClick={handleDeleteFromContextMenu}>
-                <i className="fas fa-trash"></i>
-                <span>Delete Chat</span>
-              </div>
-              <div className="context-menu-item" onClick={handleUnarchiveFromContextMenu}>
-                <i className="fas fa-inbox"></i>
-                <span>Unarchive Chat</span>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Story Context Menu */}
-      {state.storyContextMenu.visible && (
-        <div
-          className={`story-context-menu ${state.storyContextMenu.visible ? 'active' : ''}`}
-          style={{
-            position: 'fixed',
-            left: Math.min(state.storyContextMenu.x, window.innerWidth - 200),
-            top: Math.min(state.storyContextMenu.y, window.innerHeight - 200),
-            zIndex: 1000
-          }}
-        >
-          {state.storyContextMenu.storyId === yourStory.id ? (
-            <div className="context-menu-item delete" onClick={() => deleteStory(yourStory.id)}>
-              <i className="fas fa-trash"></i>
-              <span>Delete Story</span>
-            </div>
-          ) : (
-            <>
-              {state.storyContextMenu.isMutedStory ? (
-                <div className="context-menu-item" onClick={() => unmuteStory(state.storyContextMenu.storyId!)}>
-                  <i className="fas fa-volume-up"></i>
-                  <span>Unmute Story</span>
-                </div>
-              ) : (
-                <div className="context-menu-item" onClick={() => muteStory(state.storyContextMenu.storyId!)}>
-                  <i className="fas fa-volume-mute"></i>
-                  <span>Mute Story</span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      <ContextMenus
+        contextMenu={state.contextMenu}
+        storyContextMenu={state.storyContextMenu}
+        onDeleteChat={handleDeleteFromContextMenu}
+        onArchiveChat={handleArchiveFromContextMenu}
+        onUnarchiveChat={handleUnarchiveFromContextMenu}
+        onMuteStory={muteStory}
+        onUnmuteStory={unmuteStory}
+        onDeleteStory={deleteStory}
+        yourStoryId={yourStory.id}
+      />
 
       {/* Call Interfaces */}
-      {(state.callState.isOutgoingCall || state.callState.isCallActive || state.callState.isCallEnded) && (
-        <>
-          <div className="call-interface-overlay"></div>
-          <div className="call-interface">
-            <div className="call-header">
-              <img
-                src={state.callState.callRecipient?.avatar || 'https://i.pravatar.cc/150?img=1'}
-                alt=""
-                className="call-user-avatar"
-              />
-              <h2 className="call-user-name">{state.callState.callRecipient?.name || 'Unknown'}</h2>
-              <p className="call-status">
-                {state.callState.isOutgoingCall ? 'Ringing...' :
-                  state.callState.isCallActive ? 'Connected' :
-                    'Call Ended'}
-              </p>
-              {(state.callState.isCallActive || (state.callState.isCallEnded && state.callState.totalCallTime > 0)) && (
-                <p className="call-timer">
-                  {state.callState.isCallActive ?
-                    formatCallDuration(state.callState.callDuration) :
-                    `Call Duration: ${formatCallDuration(state.callState.totalCallTime)}`}
-                </p>
-              )}
-            </div>
-
-            {state.callState.isCallActive && (
-              <div className="call-options">
-                <button
-                  className={`call-option-btn ${state.callState.isMuted ? 'active' : ''}`}
-                  onClick={toggleMute}
-                >
-                  <i className={`fas ${state.callState.isMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
-                </button>
-                <button
-                  className={`call-option-btn ${state.callState.isSpeakerOn ? 'active' : ''}`}
-                  onClick={toggleSpeaker}
-                >
-                  <i className="fas fa-volume-up"></i>
-                </button>
-              </div>
-            )}
-
-            <div className="call-actions">
-              {state.callState.isOutgoingCall && (
-                <button className="call-action-btn cancel-call" onClick={cancelOutgoingCall}>
-                  <i className="fas fa-phone-slash"></i>
-                </button>
-              )}
-              {state.callState.isCallActive && (
-                <button className="call-action-btn end-call" onClick={endCall}>
-                  <i className="fas fa-phone-slash"></i>
-                </button>
-              )}
-              {state.callState.isCallEnded && state.callState.callType === 'outgoing' && (
-                <>
-                  <button className="call-action-btn redial-call" onClick={() => startOutgoingCall(state.callState.callRecipient!)}>
-                    <i className="fas fa-phone"></i>
-                  </button>
-                  <button className="call-action-btn close-call" onClick={() => setState(prev => ({
-                    ...prev,
-                    callState: {
-                      ...prev.callState,
-                      isCallEnded: false,
-                      callType: null,
-                      callRecipient: null
-                    }
-                  }))}>
-                    <i className="fas fa-times"></i>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+      <CallInterface
+        callState={state.callState}
+        onCancelCall={cancelOutgoingCall}
+        onEndCall={endCall}
+        onToggleMute={toggleMute}
+        onToggleSpeaker={toggleSpeaker}
+        onRedial={startOutgoingCall}
+        onClose={() => setState(prev => ({
+          ...prev,
+          callState: {
+            ...prev.callState,
+            isCallEnded: false,
+            callType: null,
+            callRecipient: null
+          }
+        }))}
+        formatCallDuration={formatCallDuration}
+      />
     </div>
   );
 }
