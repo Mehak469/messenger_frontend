@@ -4,7 +4,35 @@ import { authFetch } from "../../utils/authfetch"
 import './profile.css'
 
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1"
-const DEFAULT_AVATAR = "https://ui-avatars.com/api/?name=User&background=1877f2&color=fff&size=200"
+
+// Random colors for avatars (vibrant colors)
+const AVATAR_COLORS = [
+  '1877f2', // Blue
+  'e91e63', // Pink
+  '9c27b0', // Purple
+  '673ab7', // Deep Purple
+  '3f51b5', // Indigo
+  '2196f3', // Light Blue
+  '00bcd4', // Cyan
+  '009688', // Teal
+  '4caf50', // Green
+  '8bc34a', // Light Green
+  'cddc39', // Lime
+  'ffeb3b', // Yellow
+  'ffc107', // Amber
+  'ff9800', // Orange
+  'ff5722', // Deep Orange
+  'f44336', // Red
+  '795548', // Brown
+  '607d8b', // Blue Grey
+]
+
+// Generate random colored UI avatar
+const generateUIAvatar = (name: string): string => {
+  const randomColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
+  const encodedName = encodeURIComponent(name || 'User')
+  return `https://ui-avatars.com/api/?name=${encodedName}&background=${randomColor}&color=fff&size=200`
+}
 
 interface UserProfile {
   _id: string;
@@ -57,12 +85,15 @@ export default function ProfilePage() {
       
       const userData: UserProfile = await res.json()
      
+      // If no avatar, generate a random colored UI avatar
+      const avatar = userData.avatar || generateUIAvatar(userData.name || 'User')
+     
       const profileData: ProfileState = {
         name: userData.name || '',
         username: userData.username || '',
         bio: userData.bio || '',
         email: userData.email || '',
-        avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=1877f2&color=fff&size=200`,
+        avatar: avatar,
         saving: false,
         loading: false
       }
@@ -90,13 +121,8 @@ export default function ProfilePage() {
     try {
       const updateData: any = {
         name: profileState.name.trim(),
-        bio: profileState.bio.trim() || null
-      }
-      
-      // Always send avatar as string if it changed
-      const avatarChanged = originalProfile && profileState.avatar !== originalProfile.avatar
-      if (avatarChanged) {
-        updateData.avatar = profileState.avatar
+        bio: profileState.bio.trim() || null,
+        avatar: profileState.avatar // Always send avatar as string
       }
       
       const res = await authFetch(`${API_BASE_URL}/users/me`, {

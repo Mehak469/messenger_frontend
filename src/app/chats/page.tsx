@@ -11,6 +11,7 @@ import {
   acceptFriendRequestAPI,
   rejectFriendRequestAPI,
   } from '../../services/friendsapi'
+import { getConversationsAPI } from '../../services/conversationapi'
 import { Chat,SelectedUser,SentRequest,Message,Story,Notification,CallState,Friend,AppState } from '../../Types/chats'
 import StoriesList from '@/components/chats/StoriesList'
 import MutedStoriesList from '@/components/chats/MutedStoriesList'
@@ -237,15 +238,7 @@ export default function ChatsPage() {
     },
     stories: [...initialStoriesData],
     showMutedStories: false,
-    chats: JSON.parse(JSON.stringify(initialChatsData)),
-    messageRequests: [
-      { id: 201, name: "Zainab Malik", avatar: "https://i.pravatar.cc/150?img=16", time: "2h", message: "Hi, I'd like to connect with you!" },
-      { id: 202, name: "Ahmed Raza", avatar: "https://i.pravatar.cc/150?img=17", time: "5h", message: "Hello, can we talk?" }
-    ],
-    pendingRequests: [
-      { id: 301, name: "Ayesha Khan", avatar: "https://i.pravatar.cc/150?img=18", time: "1d", status: "Pending" },
-      { id: 302, name: "Omar Farooq", avatar: "https://i.pravatar.cc/150?img=19", time: "3d", status: "Pending" }
-    ],
+    chats: [], // Will be loaded from API
     archivedChats: [
       // Haider Mughal ki chat yahan say remove kar di gayi hai
     ],
@@ -277,12 +270,12 @@ export default function ChatsPage() {
     showStoryOptionsMenu: false,
     longPressTimer: null,
     isSendingRequest: false,   
-    isLoadingUser: false,     // Add this
-    isSearching: false,      // Add this
+    isLoadingUser: false,     
+    isSearching: false,     
     sentRequests: [],
-    receivedRequests: [], // Add this for incoming friend requests
-     friends: [], // Add empty array for friends
-  isLoadingFriends: false, // Add loading stat
+    receivedRequests: [], 
+    friends: [], 
+    isLoadingFriends: false, 
 
   });
 
@@ -332,6 +325,115 @@ const formatTime = (dateString: string): string => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } catch (error) {
     return 'Just now';
+  }
+};
+
+// Helper function to convert string ID to number (simple hash)
+const stringIdToNumber = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+};
+
+// Function to load conversations from API
+const loadConversations = async (): Promise<Chat[]> => {
+  try {
+    // Get current user ID from localStorage
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      console.error('No user data found');
+      return [];
+    }
+
+    const parsedUserData = JSON.parse(userData);
+    const currentUserId = parsedUserData._id;
+
+    if (!currentUserId) {
+      console.error('No user ID found');
+      return [];
+    }
+
+    // Fetch conversations from API
+    const response = await getConversationsAPI();
+    
+    if (!response || !response.conversations) {
+      console.error('Invalid response from conversations API');
+      return [];
+    }
+
+    // Transform each conversation to Chat format
+    const chatPromises = response.conversations.map(async (conv: any) => {
+      try {
+        // Find the receiver (participant that's not the current user)
+        const receiverId = conv.participants.find(
+          (participantId: string) => participantId !== currentUserId
+        );
+
+        if (!receiverId) {
+          console.warn('No receiver found for conversation:', conv._id);
+          return null;
+        }
+
+        // Fetch receiver user details
+        const receiverUser = await getUserByIdAPI(receiverId);
+
+        // Get unread count for current user
+        const unreadCount = conv.unread_counts?.[currentUserId] || 0;
+
+        // Format last message time
+        const lastMessageTime = conv.last_message_time 
+          ? formatTime(conv.last_message_time) 
+          : formatTime(conv.created_at);
+
+        // Convert conversation ID to number
+        const chatId = stringIdToNumber(conv._id);
+
+        // Create Chat object with original conversation data for sorting
+        const chat: Chat & { _sortTime?: string } = {
+          id: chatId,
+          name: receiverUser?.name || 'Unknown User',
+          avatar: receiverUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(receiverUser?.name || 'User')}&background=1877f2&color=fff&size=200`,
+          lastMessage: conv.last_message || '',
+          time: lastMessageTime,
+          unread: unreadCount,
+          isOnline: false, // TODO: Implement online status if available
+          messages: [], // Messages will be loaded separately when chat is opened
+          _sortTime: conv.last_message_time || conv.created_at // Store for sorting
+        };
+
+        return chat;
+      } catch (error) {
+        console.error('Error processing conversation:', conv._id, error);
+        return null;
+      }
+    });
+
+    const chats = await Promise.all(chatPromises);
+
+    // Filter out null values and sort by last_message_time (most recent first)
+    const validChats = chats.filter((chat): chat is Chat & { _sortTime?: string } => chat !== null);
+    
+    // Sort by last_message_time (most recent first)
+    validChats.sort((a, b) => {
+      const timeA = a._sortTime;
+      const timeB = b._sortTime;
+
+      if (!timeA && !timeB) return 0;
+      if (!timeA) return 1;
+      if (!timeB) return -1;
+      
+      return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+
+    // Remove the temporary _sortTime property
+    return validChats.map(({ _sortTime, ...chat }) => chat);
+  } catch (error) {
+    console.error('Error loading conversations:', error);
+    return [];
   }
 };
 const cancelSentRequest = async (requestId: string) => {
@@ -589,6 +691,28 @@ const rejectFriendRequest = async (requestId: string) => {
     };
   }, []);
 
+  // Load conversations from API on component mount
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const conversations = await loadConversations();
+        setState(prev => ({
+          ...prev,
+          chats: conversations
+        }));
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+        // Keep empty array on error, or fallback to initialChatsData if needed
+      }
+    };
+
+    // Only load if user is authenticated
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      fetchConversations();
+    }
+  }, []);
+
  useEffect(() => {
   const loadSentRequests = async () => {
     try {
@@ -651,6 +775,22 @@ const rejectFriendRequest = async (requestId: string) => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [state.contextMenu.visible, state.storyContextMenu.visible, state.showAttachmentMenu, state.showEmojiPicker]);
+
+  // Handle ESC key to close chat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && state.activeChat) {
+        setState(prev => ({
+          ...prev,
+          activeChat: null,
+          messages: []
+        }));
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [state.activeChat]);
 
   // Story progress interval
   useEffect(() => {
@@ -723,8 +863,23 @@ const rejectFriendRequest = async (requestId: string) => {
     }));
   };
 
+  // Function to close the active chat
+  const closeChat = () => {
+    setState(prev => ({
+      ...prev,
+      activeChat: null,
+      messages: []
+    }));
+  };
+
   // ===== FIXED: Handle Chat Click for Both Active and Archived Chats =====
   const handleChatClick = (chatId: number) => {
+    // If clicking the same chat that's already open, close it
+    if (state.activeChat?.id === chatId) {
+      closeChat();
+      return;
+    }
+
     // First search in active chats
     let chat: Chat | undefined = state.chats.find(c => c.id === chatId);
 
@@ -1404,7 +1559,6 @@ const rejectFriendRequest = async (requestId: string) => {
   const unarchiveChat = (id: number) => {
     const chatToUnarchive = state.archivedChats.find(chat => chat.id === id);
     if (chatToUnarchive) {
-      const originalChat = initialChatsData.find(chat => chat.id === id);
       const newChat: Chat = {
         id: chatToUnarchive.id,
         name: chatToUnarchive.name,
@@ -1413,7 +1567,7 @@ const rejectFriendRequest = async (requestId: string) => {
         time: chatToUnarchive.time,
         unread: chatToUnarchive.unread || 0,
         isOnline: chatToUnarchive.isOnline || false,
-        messages: chatToUnarchive.messages || originalChat?.messages || []
+        messages: chatToUnarchive.messages || []
       };
 
       setState(prev => ({
@@ -1831,7 +1985,7 @@ const rejectFriendRequest = async (requestId: string) => {
   }
 };
   const acceptRequest = (requestId: number) => {
-    const request = state.messageRequests.find(req => req.id === requestId);
+    const request = state.receivedRequests.find(req => req.id === requestId);
     if (request) {
       const newChat: Chat = {
         id: Date.now(),
@@ -1862,7 +2016,7 @@ const rejectFriendRequest = async (requestId: string) => {
 
       setState(prev => ({
         ...prev,
-        messageRequests: prev.messageRequests.filter(req => req.id !== requestId),
+        receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId),
         chats: [newChat, ...prev.chats],
         activeChat: newChat,
         messages: newChat.messages
@@ -1873,14 +2027,14 @@ const rejectFriendRequest = async (requestId: string) => {
   const rejectRequest = (requestId: number) => {
     setState(prev => ({
       ...prev,
-      messageRequests: prev.messageRequests.filter(req => req.id !== requestId)
+      receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
     }));
   };
 
   const removePendingRequest = (requestId: number) => {
     setState(prev => ({
       ...prev,
-      pendingRequests: prev.pendingRequests.filter(req => req.id !== requestId)
+      sentRequests: prev.sentRequests.filter(req => req.id !== requestId)
     }));
   };
   
@@ -2317,7 +2471,7 @@ const rejectFriendRequest = async (requestId: string) => {
                 >
                   <i className="fas fa-user-friends"></i>
                   <span>Message Request</span>
-                  {state.messageRequests.length > 0 && (
+                  {state.receivedRequests.length > 0 && (
                     <div className="mobile-nav-indicator"></div>
                   )}
                 </div>
@@ -2342,7 +2496,7 @@ const rejectFriendRequest = async (requestId: string) => {
             activeSection={state.activeSection}
             profileAvatar={profileAvatar}
             notifications={state.notifications}
-            messageRequests={state.messageRequests}
+            receivedRequests={state.receivedRequests}
             onSectionChange={setActiveSection}
           />
 
@@ -2502,6 +2656,7 @@ const rejectFriendRequest = async (requestId: string) => {
                   chat={state.activeChat}
                   isMobile={false}
                   onStartCall={startOutgoingCall}
+                  onClose={closeChat}
                 />
 
                 <div className="messages-container">

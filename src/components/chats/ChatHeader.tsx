@@ -7,13 +7,15 @@ interface ChatHeaderProps {
   isMobile: boolean
   onStartCall: (contact: Chat) => void
   onBack?: () => void
+  onClose?: () => void
 }
 
 export default function ChatHeader({
   chat,
   isMobile,
   onStartCall,
-  onBack
+  onBack,
+  onClose
 }: ChatHeaderProps) {
   if (isMobile) {
     return (
@@ -60,6 +62,27 @@ export default function ChatHeader({
       <div className="chat-actions">
         <i className="fas fa-video"></i>
         <i className="fas fa-phone" onClick={() => onStartCall(chat)}></i>
+        {onClose && (
+          <button 
+            className="chat-close-btn" 
+            onClick={onClose}
+            title="Close chat (ESC)"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              marginLeft: '8px',
+              color: '#65676b',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        )}
       </div>
     </div>
   )

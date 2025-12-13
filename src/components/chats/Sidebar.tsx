@@ -5,7 +5,7 @@ interface SidebarProps {
   activeSection: string
   profileAvatar: string
   notifications: any[]
-  messageRequests: any[]
+  receivedRequests: any[]
   onSectionChange: (section: string) => void
 }
 
@@ -13,7 +13,7 @@ export default function Sidebar({
   activeSection,
   profileAvatar,
   notifications,
-  messageRequests,
+  receivedRequests,
   onSectionChange
 }: SidebarProps) {
   return (
@@ -42,7 +42,7 @@ export default function Sidebar({
         >
           <i className="fas fa-user-friends"></i>
           <div className="icon-tooltip">Message Requests</div>
-          {messageRequests.length > 0 && (
+          {receivedRequests.length > 0 && (
             <div className="notification-indicator"></div>
           )}
         </div>

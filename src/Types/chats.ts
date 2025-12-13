@@ -122,8 +122,6 @@ export interface AppState {
   stories: Story[];
   showMutedStories: boolean;
   chats: Chat[];
-  messageRequests: any[];
-  pendingRequests: any[];
   archivedChats: any[];
   notifications: Notification[];
   activeChat: Chat | null;
