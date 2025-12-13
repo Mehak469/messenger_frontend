@@ -1,10 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import './chats.css'
-import { authFetch } from '../../utils/authfetch'
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
 
 // Types (وہی رہیں گے)
 interface Chat {
@@ -86,7 +82,6 @@ interface AppState {
     y: number;
     chatId: number | null;
     type: string | null;
-
   };
   storyContextMenu: {
     visible: boolean;
@@ -128,8 +123,6 @@ interface AppState {
   showChatContextMenu: boolean;
   showStoryOptionsMenu: boolean;
   longPressTimer: any;
-  isSendingRequest: boolean;   // Add this
-
 }
 
 // Initial data - REMOVED Irfan Shameer from chats
@@ -295,8 +288,8 @@ const dummyUsers = [
 
 const popularEmojis = [
   '😀', '😂', '😍', '🥰', '😎', '🤩', '😜', '🤗', '👍', '👏',
-  '❤', '🔥', '💯', '✨', '🎉', '🙏', '😊', '😘', '😉', '🤔', '🌸', '💞', '🥲', '✅',
-  '🫀', '🥹', '🤨', '😡', '😶‍🌫', '😴', '👿', '👏', '👍🏻', '👀'
+  '❤', '🔥', '💯', '✨', '🎉', '🙏', '😊', '😘', '😉', '🤔','🌸','💞','🥲','✅',
+  '🫀','🥹','🤨','😡','😶‍🌫','😴','👿','👏','👍🏻','👀'
 ];
 
 export default function ChatsPage() {
@@ -375,9 +368,7 @@ export default function ChatsPage() {
     dummyUsers: dummyUsers,
     showChatContextMenu: false,
     showStoryOptionsMenu: false,
-    longPressTimer: null,
-    isSendingRequest: false,     // Add this
-
+    longPressTimer: null
   });
 
   const [profileAvatar, setProfileAvatar] = useState('https://i.pravatar.cc/150?img=32');
@@ -398,63 +389,10 @@ export default function ChatsPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartRef = useRef<number>(0);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // Search Users API function
-  const searchUsersAPI = async (query: string) => {
-    try {
-      const userData = localStorage.getItem('user');
-      if (!userData) {
-        window.location.href = '/auth';
-        return { results: [] };
-      }
 
-      const parsedUserData = JSON.parse(userData);
-      const token = parsedUserData.access_token;
-
-      const response = await fetch(`${API_BASE_URL}/users/search?q=${encodeURIComponent(query)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        console.error('Search failed:', response.status);
-        return { results: [] };
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Search API error:', error);
-      return { results: [] };
-    }
-  };
-
-  // Send Friend Request API function - PROTECTED (uses authFetch)
-  const sendFriendRequestAPI = async (receiverId: string, message: string) => {
-    try {
-      const response = await authFetch(`${API_BASE_URL}/friends/request/${receiverId}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          message: message
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to send friend request');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Send friend request error:', error);
-      throw error;
-    }
-  };
   useEffect(() => {
     setIsClient(true);
-
+    
     const userData = localStorage.getItem('user');
     if (!userData) {
       window.location.href = '/auth';
@@ -528,9 +466,9 @@ export default function ChatsPage() {
           return { ...prev, storyProgress: prev.storyProgress + 1 };
         });
       }, 50);
-
+      
       setState(prev => ({ ...prev, storyProgressInterval: interval }));
-
+      
       return () => clearInterval(interval);
     }
   }, [state.showStoriesViewer, state.isStoryPlaying, state.storyProgress]);
@@ -558,7 +496,7 @@ export default function ChatsPage() {
           }
         }));
       }, 1000);
-
+      
       return () => clearInterval(interval);
     }
   }, [state.callState.isCallActive]);
@@ -572,7 +510,7 @@ export default function ChatsPage() {
           recordingTime: prev.recordingTime + 1
         }));
       }, 1000);
-
+      
       return () => clearInterval(interval);
     }
   }, [state.isRecording]);
@@ -591,7 +529,7 @@ export default function ChatsPage() {
   const handleChatClick = (chatId: number) => {
     // First search in active chats
     let chat = state.chats.find(c => c.id === chatId);
-
+    
     // If not found in active chats, search in archived chats
     if (!chat) {
       const archivedChat = state.archivedChats.find(c => c.id === chatId);
@@ -605,7 +543,7 @@ export default function ChatsPage() {
         };
       }
     }
-
+    
     if (chat) {
       setState(prev => ({
         ...prev,
@@ -617,7 +555,7 @@ export default function ChatsPage() {
 
   const sendMessage = () => {
     if (!state.newMessage.trim()) return;
-
+    
     const currentTime = getCurrentTime();
     const newMsg: Message = {
       id: state.messages.length + 1,
@@ -626,17 +564,17 @@ export default function ChatsPage() {
       isUser: true,
       type: 'text'
     };
-
+    
     const updatedMessages = [...state.messages, newMsg];
-
+    
     setState(prev => ({
       ...prev,
       messages: updatedMessages,
       newMessage: ''
     }));
-
+    
     reorderChats(state.activeChat!.id, state.newMessage, currentTime);
-
+    
     setTimeout(() => {
       const replyText = getRandomReply();
       const replyTime = getCurrentTime();
@@ -647,12 +585,12 @@ export default function ChatsPage() {
         isUser: false,
         type: 'text'
       };
-
+      
       setState(prev => ({
         ...prev,
         messages: [...updatedMessages, replyMsg]
       }));
-
+      
       reorderChats(state.activeChat!.id, replyText, replyTime);
     }, 1000);
   };
@@ -682,31 +620,31 @@ export default function ChatsPage() {
     if (chatIndex !== -1) {
       const updatedChats = [...state.chats];
       const chatToMove = { ...updatedChats[chatIndex] };
-
+      
       chatToMove.lastMessage = lastMessage;
       chatToMove.time = time;
-
+      
       updatedChats.splice(chatIndex, 1);
       updatedChats.unshift(chatToMove);
-
+      
       setState(prev => ({
         ...prev,
         chats: updatedChats
       }));
     }
-
+    
     // Also update in archived chats if the chat is archived
     const archivedIndex = state.archivedChats.findIndex(chat => chat.id === chatId);
     if (archivedIndex !== -1) {
       const updatedArchivedChats = [...state.archivedChats];
       const archivedChatToUpdate = { ...updatedArchivedChats[archivedIndex] };
-
+      
       archivedChatToUpdate.lastMessage = lastMessage;
       archivedChatToUpdate.time = time;
-
+      
       setState(prev => ({
         ...prev,
-        archivedChats: updatedArchivedChats.map(chat =>
+        archivedChats: updatedArchivedChats.map(chat => 
           chat.id === chatId ? archivedChatToUpdate : chat
         )
       }));
@@ -730,7 +668,7 @@ export default function ChatsPage() {
         callRecipient: contact
       }
     }));
-
+    
     setTimeout(() => {
       setState(prev => ({
         ...prev,
@@ -745,7 +683,7 @@ export default function ChatsPage() {
 
   const endCall = () => {
     const finalCallTime = state.callState.callDuration;
-
+    
     setState(prev => ({
       ...prev,
       callState: {
@@ -757,7 +695,7 @@ export default function ChatsPage() {
         totalCallTime: finalCallTime
       }
     }));
-
+    
     setTimeout(() => {
       setState(prev => ({
         ...prev,
@@ -789,7 +727,7 @@ export default function ChatsPage() {
         callType: 'outgoing'
       }
     }));
-
+    
     setTimeout(() => {
       setState(prev => ({
         ...prev,
@@ -832,7 +770,7 @@ export default function ChatsPage() {
   const openStory = (storyId: number, itemIndex: number = 0) => {
     let storyIndex = -1;
     let currentStories = [...state.stories];
-
+    
     if (storyId === yourStory.id) {
       setState(prev => ({
         ...prev,
@@ -845,10 +783,10 @@ export default function ChatsPage() {
       }));
       return;
     }
-
+    
     storyIndex = currentStories.findIndex(story => story.id === storyId);
     if (storyIndex === -1) return;
-
+    
     setState(prev => ({
       ...prev,
       currentStoryIndex: storyIndex,
@@ -857,7 +795,7 @@ export default function ChatsPage() {
       isStoryPlaying: true,
       storyProgress: 0,
       showStoryMessageBox: false,
-      stories: prev.stories.map((story, i) =>
+      stories: prev.stories.map((story, i) => 
         i === storyIndex ? { ...story, hasNewStory: false, isSeen: true } : story
       )
     }));
@@ -885,7 +823,7 @@ export default function ChatsPage() {
   const nextStoryItem = () => {
     const isYourStory = state.currentStoryIndex === -1;
     const currentStory = isYourStory ? yourStory : state.stories[state.currentStoryIndex];
-
+    
     if (state.currentStoryItemIndex < (currentStory.storyCount || 1) - 1) {
       setState(prev => ({
         ...prev,
@@ -911,19 +849,19 @@ export default function ChatsPage() {
 
   const nextStory = () => {
     const isYourStory = state.currentStoryIndex === -1;
-
+    
     if (isYourStory) {
       closeStory();
       return;
     }
-
+    
     if (state.currentStoryIndex < state.stories.length - 1) {
       setState(prev => ({
         ...prev,
         currentStoryIndex: prev.currentStoryIndex + 1,
         currentStoryItemIndex: 0,
         storyProgress: 0,
-        stories: prev.stories.map((story, i) =>
+        stories: prev.stories.map((story, i) => 
           i === prev.currentStoryIndex + 1 ? { ...story, hasNewStory: false, isSeen: true } : story
         )
       }));
@@ -934,11 +872,11 @@ export default function ChatsPage() {
 
   const prevStory = () => {
     const isYourStory = state.currentStoryIndex === -1;
-
+    
     if (isYourStory) {
       return;
     }
-
+    
     if (state.currentStoryIndex > 0) {
       setState(prev => ({
         ...prev,
@@ -952,7 +890,7 @@ export default function ChatsPage() {
   // Mobile Touch Handlers
   const handleChatTouchStart = (chatId: number, type: string = 'chat', e: React.TouchEvent) => {
     touchStartRef.current = e.touches[0].clientX;
-
+    
     longPressTimerRef.current = setTimeout(() => {
       const touch = e.touches[0];
       showChatContextMenu(chatId, type, touch.clientX, touch.clientY);
@@ -963,7 +901,7 @@ export default function ChatsPage() {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
     }
-
+    
     // Check if it was a swipe (for mobile)
     const touchEnd = e.changedTouches[0].clientX;
     if (Math.abs(touchEnd - touchStartRef.current) < 10) {
@@ -1022,7 +960,7 @@ export default function ChatsPage() {
   const handleStoryRightClick = (e: React.MouseEvent, storyId: number) => {
     e.preventDefault();
     e.stopPropagation();
-
+    
     const story = state.stories.find(s => s.id === storyId) || (storyId === yourStory.id ? yourStory : null);
     if (story) {
       setState(prev => ({
@@ -1040,10 +978,10 @@ export default function ChatsPage() {
 
   const muteStory = (storyId: number) => {
     if (storyId === yourStory.id) return;
-
+    
     setState(prev => ({
       ...prev,
-      stories: prev.stories.map(story =>
+      stories: prev.stories.map(story => 
         story.id === storyId ? { ...story, isMuted: true } : story
       ),
       storyContextMenu: { ...prev.storyContextMenu, visible: false }
@@ -1052,10 +990,10 @@ export default function ChatsPage() {
 
   const unmuteStory = (storyId: number) => {
     if (storyId === yourStory.id) return;
-
+    
     setState(prev => ({
       ...prev,
-      stories: prev.stories.map(story =>
+      stories: prev.stories.map(story => 
         story.id === storyId ? { ...story, isMuted: false } : story
       ),
       storyContextMenu: { ...prev.storyContextMenu, visible: false }
@@ -1071,7 +1009,7 @@ export default function ChatsPage() {
         storyCount: 0,
         hasNewStory: false
       }));
-
+      
       if (state.showStoriesViewer && state.currentStoryIndex === -1) {
         closeStory();
       }
@@ -1095,17 +1033,17 @@ export default function ChatsPage() {
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (!files || files.length === 0) return;
-
+      
       const newMediaUrls: string[] = [];
       const newCaptions: string[] = [];
-
+      
       Array.from(files).forEach((file, index) => {
         const reader = new FileReader();
         reader.onload = (event) => {
           const mediaUrl = event.target?.result as string;
           newMediaUrls.push(mediaUrl);
           newCaptions.push(`My story ${index + 1} 📸`);
-
+          
           if (newMediaUrls.length === files.length) {
             setYourStory(prev => ({
               ...prev,
@@ -1115,7 +1053,7 @@ export default function ChatsPage() {
               time: 'Just now',
               hasNewStory: true
             }));
-
+            
             setState(prev => ({
               ...prev,
               currentStoryIndex: -1,
@@ -1140,11 +1078,11 @@ export default function ChatsPage() {
 
   const toggleStoryMessageBox = () => {
     const isYourStory = state.currentStoryIndex === -1;
-
+    
     if (isYourStory) return;
-
-    setState(prev => ({
-      ...prev,
+    
+    setState(prev => ({ 
+      ...prev, 
       showStoryMessageBox: !prev.showStoryMessageBox,
       isStoryPlaying: !prev.showStoryMessageBox
     }));
@@ -1152,17 +1090,17 @@ export default function ChatsPage() {
 
   const handleStoryMessageSend = () => {
     if (!state.storyMessage.trim()) return;
-
+    
     const isYourStory = state.currentStoryIndex === -1;
-
+    
     if (isYourStory) return;
-
+    
     const currentStory = state.stories[state.currentStoryIndex];
     if (!currentStory.isMyStory) {
-      const storyUserChat = state.chats.find(chat =>
+      const storyUserChat = state.chats.find(chat => 
         chat.name.toLowerCase().includes(currentStory.name.toLowerCase())
       );
-
+      
       if (storyUserChat) {
         const currentTime = getCurrentTime();
         const storyReplyMessage: Message = {
@@ -1172,12 +1110,12 @@ export default function ChatsPage() {
           isUser: true,
           type: 'text'
         };
-
+        
         const updatedMessages = [...storyUserChat.messages, storyReplyMessage];
-
+        
         setState(prev => ({
           ...prev,
-          chats: prev.chats.map(chat =>
+          chats: prev.chats.map(chat => 
             chat.id === storyUserChat.id ? {
               ...chat,
               messages: updatedMessages,
@@ -1186,21 +1124,21 @@ export default function ChatsPage() {
             } : chat
           )
         }));
-
+        
         reorderChats(storyUserChat.id, state.storyMessage, currentTime);
-
+        
         if (state.activeChat?.id === storyUserChat.id) {
           setState(prev => ({
             ...prev,
             messages: updatedMessages
           }));
         }
-
+        
         closeStory();
         handleChatClick(storyUserChat.id);
       }
     }
-
+    
     setState(prev => ({
       ...prev,
       storyMessage: '',
@@ -1212,7 +1150,7 @@ export default function ChatsPage() {
   const handleChatRightClick = (e: React.MouseEvent, chatId: number, type: string = 'chat') => {
     e.preventDefault();
     e.stopPropagation();
-
+    
     setState(prev => ({
       ...prev,
       contextMenu: {
@@ -1250,7 +1188,7 @@ export default function ChatsPage() {
         isOnline: chatToArchive.isOnline,
         messages: chatToArchive.messages
       };
-
+      
       setState(prev => ({
         ...prev,
         archivedChats: [...prev.archivedChats, archivedChat],
@@ -1278,7 +1216,7 @@ export default function ChatsPage() {
         isOnline: chatToUnarchive.isOnline || false,
         messages: chatToUnarchive.messages || originalChat?.messages || []
       };
-
+      
       setState(prev => ({
         ...prev,
         chats: [...prev.chats, newChat],
@@ -1317,19 +1255,19 @@ export default function ChatsPage() {
   const markNotificationAsRead = (id: number) => {
     setState(prev => ({
       ...prev,
-      notifications: prev.notifications.map(notification =>
+      notifications: prev.notifications.map(notification => 
         notification.id === id ? { ...notification, isNew: false } : notification
       )
     }));
   };
 
   // ===== FIXED SEARCH FUNCTIONALITY =====
-  const handleSearch = async (query: string) => {
+  const handleSearch = (query: string) => {
     setState(prev => ({
       ...prev,
       searchQuery: query
     }));
-
+    
     if (!query.trim()) {
       setState(prev => ({
         ...prev,
@@ -1337,82 +1275,38 @@ export default function ChatsPage() {
       }));
       return;
     }
-
+    
     const lowerQuery = query.toLowerCase();
-
-    // For different sections, handle search differently
+    let results: any[] = [];
+    
     if (state.activeSection === 'chats') {
-      // Search in active chats
-      const results = state.chats.filter(chat =>
+      // FIXED: Show chats where name starts with search query (case insensitive)
+      results = state.chats.filter(chat => 
         chat.name.toLowerCase().startsWith(lowerQuery)
       );
-      setState(prev => ({
-        ...prev,
-        searchResults: results
-      }));
-
     } else if (state.activeSection === 'notifications') {
-      // Search in notifications
-      const results = state.notifications.filter(notification =>
-        notification.title.toLowerCase().includes(lowerQuery) ||
+      results = state.notifications.filter(notification => 
+        notification.title.toLowerCase().includes(lowerQuery) || 
         notification.description.toLowerCase().includes(lowerQuery)
       );
-      setState(prev => ({
-        ...prev,
-        searchResults: results
-      }));
-
     } else if (state.activeSection === 'requests') {
-      // ===== INTEGRATED SEARCH ENDPOINT HERE =====
-      try {
-        // Call the search API
-        const apiResult = await searchUsersAPI(query);
-
-        // Transform API data to match your format
-        const transformedResults = apiResult.results.map((user: any) => ({
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          avatar: user.avatar,
-          isConnected: state.chats.some(chat =>
-            chat.name.toLowerCase() === user.name.toLowerCase() ||
-            chat.name.toLowerCase() === user.username.toLowerCase()
-          ),
-          bio: user.bio,
-          friends: user.friends
-        }));
-
-        setState(prev => ({
-          ...prev,
-          searchResults: transformedResults
-        }));
-
-      } catch (error) {
-        console.error('Search failed:', error);
-        // Fallback to local search
-        const connectedUserNames = state.chats.map(chat => chat.name.toLowerCase());
-        const results = state.dummyUsers.filter(user => {
-          const userName = user.name.toLowerCase();
-          return userName.startsWith(lowerQuery) && !connectedUserNames.includes(userName);
-        });
-        setState(prev => ({
-          ...prev,
-          searchResults: results
-        }));
-      }
-
+      // FIXED: Show users whose names start with search query and are not already connected
+      const connectedUserNames = state.chats.map(chat => chat.name.toLowerCase());
+      results = state.dummyUsers.filter(user => {
+        const userName = user.name.toLowerCase();
+        return userName.startsWith(lowerQuery) && !connectedUserNames.includes(userName);
+      });
     } else if (state.activeSection === 'archived') {
-      // Search in archived chats
-      const results = state.archivedChats.filter((chat: any) =>
-        chat.name.toLowerCase().includes(lowerQuery) ||
+      results = state.archivedChats.filter((chat: any) => 
+        chat.name.toLowerCase().includes(lowerQuery) || 
         chat.lastMessage.toLowerCase().includes(lowerQuery)
       );
-      setState(prev => ({
-        ...prev,
-        searchResults: results
-      }));
     }
+    
+    setState(prev => ({
+      ...prev,
+      searchResults: results
+    }));
   };
 
   // ===== UPDATED: Thumb emoji send function =====
@@ -1425,13 +1319,13 @@ export default function ChatsPage() {
       isUser: true,
       type: 'like'
     };
-
+    
     const updatedMessages = [...state.messages, likeMessage];
     setState(prev => ({
       ...prev,
       messages: updatedMessages
     }));
-
+    
     reorderChats(state.activeChat!.id, "👍", currentTime);
   };
 
@@ -1464,15 +1358,15 @@ export default function ChatsPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
-
+      
       recorder.ondataavailable = (e) => {
         chunks.push(e.data);
       };
-
+      
       recorder.onstop = () => {
         const audioBlob = new Blob(chunks, { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(audioBlob);
-
+        
         const currentTime = getCurrentTime();
         const voiceMessage: Message = {
           id: state.messages.length + 1,
@@ -1483,19 +1377,19 @@ export default function ChatsPage() {
           voiceUrl: audioUrl,
           duration: state.recordingTime
         };
-
+        
         const updatedMessages = [...state.messages, voiceMessage];
         setState(prev => ({
           ...prev,
           messages: updatedMessages,
           audioChunks: []
         }));
-
+        
         reorderChats(state.activeChat!.id, "Voice message", currentTime);
-
+        
         stream.getTracks().forEach(track => track.stop());
       };
-
+      
       recorder.start();
       setState(prev => ({
         ...prev,
@@ -1531,14 +1425,14 @@ export default function ChatsPage() {
     if (state.audioRef) {
       state.audioRef.pause();
     }
-
+    
     const audio = new Audio(voiceUrl);
     setState(prev => ({
       ...prev,
       audioRef: audio,
       playingVoiceMessage: messageId
     }));
-
+    
     audio.onended = () => {
       setState(prev => ({
         ...prev,
@@ -1546,7 +1440,7 @@ export default function ChatsPage() {
         audioRef: null
       }));
     };
-
+    
     audio.play().catch(error => {
       console.error('Error playing voice message:', error);
       setState(prev => ({
@@ -1575,12 +1469,12 @@ export default function ChatsPage() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-
+      
       const reader = new FileReader();
       reader.onload = (event) => {
         const currentTime = getCurrentTime();
         const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
-
+        
         const newMsg: Message = {
           id: state.messages.length + 1,
           content: event.target?.result as string,
@@ -1589,16 +1483,16 @@ export default function ChatsPage() {
           type: mediaType === 'image' ? 'image' : 'video',
           mediaType: mediaType
         };
-
+        
         const updatedMessages = [...state.messages, newMsg];
         setState(prev => ({
           ...prev,
           messages: updatedMessages
         }));
-
+        
         const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
         reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
-
+        
         setTimeout(() => {
           const replyText = "Nice! 👍";
           const replyTime = getCurrentTime();
@@ -1609,26 +1503,26 @@ export default function ChatsPage() {
             isUser: false,
             type: 'text'
           };
-
+          
           setState(prev => ({
             ...prev,
             messages: [...updatedMessages, replyMsg]
           }));
-
+          
           reorderChats(state.activeChat!.id, replyText, replyTime);
         }, 1500);
       };
       reader.readAsDataURL(file);
     };
     input.click();
-
+    
     setState(prev => ({ ...prev, showAttachmentMenu: false }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, mediaType: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       const currentTime = getCurrentTime();
@@ -1640,16 +1534,16 @@ export default function ChatsPage() {
         type: mediaType === 'image' ? 'image' : 'video',
         mediaType: mediaType
       };
-
+      
       const updatedMessages = [...state.messages, newMsg];
       setState(prev => ({
         ...prev,
         messages: updatedMessages
       }));
-
+      
       const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
       reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
-
+      
       setTimeout(() => {
         const replyText = "Nice! 👍";
         const replyTime = getCurrentTime();
@@ -1660,17 +1554,17 @@ export default function ChatsPage() {
           isUser: false,
           type: 'text'
         };
-
+        
         setState(prev => ({
           ...prev,
           messages: [...updatedMessages, replyMsg]
         }));
-
+        
         reorderChats(state.activeChat!.id, replyText, replyTime);
       }, 1500);
     };
     reader.readAsDataURL(file);
-
+    
     setState(prev => ({ ...prev, showAttachmentMenu: false }));
     e.target.value = '';
   };
@@ -1698,12 +1592,12 @@ export default function ChatsPage() {
         isOnline: true,
         isActive: true,
         messages: [
-          {
-            id: 1,
-            text: request.message || "Hi! Thanks for accepting my request.",
-            time: request.time,
-            isUser: false,
-            type: 'text'
+          { 
+            id: 1, 
+            text: request.message || "Hi! Thanks for accepting my request.", 
+            time: request.time, 
+            isUser: false, 
+            type: 'text' 
           },
           {
             id: 2,
@@ -1714,7 +1608,7 @@ export default function ChatsPage() {
           }
         ]
       };
-
+      
       setState(prev => ({
         ...prev,
         messageRequests: prev.messageRequests.filter(req => req.id !== requestId),
@@ -1757,75 +1651,30 @@ export default function ChatsPage() {
     }));
   };
 
-  const sendFriendRequest = async () => {
-    if (!state.requestMessage.trim() || !state.selectedUserForRequest) return;
-
-    try {
-      // Show loading state
-      setState(prev => ({ ...prev, isSendingRequest: true }));
-
-      // Call API with receiver ID in URL
-      const response = await sendFriendRequestAPI(
-        state.selectedUserForRequest.id, // receiver_id goes in URL
-        state.requestMessage // message goes in body
-      );
-
-      // Handle response
-      if (response.detail === 'Friend request already exists') {
-        alert('Friend request already sent to this user');
-      } else if (response.detail === 'Friend request sent') {
-        // Success - add to pending requests
-        const newPendingRequest = {
-          id: state.selectedUserForRequest.id, // Use actual user ID
-          name: state.selectedUserForRequest.name,
-          avatar: state.selectedUserForRequest.avatar,
-          time: 'Just now',
-          status: 'Pending',
-          message: state.requestMessage
-        };
-
-        setState(prev => ({
-          ...prev,
-          pendingRequests: [newPendingRequest, ...prev.pendingRequests],
-          showSendRequestModal: false,
-          selectedUserForRequest: null,
-          requestMessage: ''
-        }));
-
-        alert('Friend request sent successfully!');
-      } else {
-        alert(response.detail || 'Request sent');
-      }
-
-    } catch (error: any) {
-      console.error('Failed to send friend request:', error);
-      alert(error.message || 'Failed to send friend request');
-
-      // Fallback for demo/offline
-      const newPendingRequest = {
-        id: state.selectedUserForRequest.id,
-        name: state.selectedUserForRequest.name,
-        avatar: state.selectedUserForRequest.avatar,
-        time: 'Just now',
-        status: 'Pending',
-        message: state.requestMessage
-      };
-
-      setState(prev => ({
-        ...prev,
-        pendingRequests: [newPendingRequest, ...prev.pendingRequests],
-        showSendRequestModal: false,
-        selectedUserForRequest: null,
-        requestMessage: ''
-      }));
-
-    } finally {
-      setState(prev => ({ ...prev, isSendingRequest: false }));
-    }
+  const sendFriendRequest = () => {
+    if (!state.requestMessage.trim()) return;
+    
+    const newPendingRequest = {
+      id: Date.now(),
+      name: state.selectedUserForRequest.name,
+      avatar: state.selectedUserForRequest.avatar,
+      time: 'Just now',
+      status: 'Pending',
+      message: state.requestMessage
+    };
+    
+    setState(prev => ({
+      ...prev,
+      pendingRequests: [newPendingRequest, ...prev.pendingRequests],
+      showSendRequestModal: false,
+      selectedUserForRequest: null,
+      requestMessage: ''
+    }));
   };
+
   // Check if user is already connected
   const isUserConnected = (userName: string) => {
-    return state.chats.some(chat =>
+    return state.chats.some(chat => 
       chat.name.toLowerCase() === userName.toLowerCase()
     );
   };
@@ -1895,16 +1744,16 @@ export default function ChatsPage() {
         <div key={message.id} className={`message ${message.isUser ? 'user-message' : 'friend-message'}`}>
           <div className="voice-message">
             <div className="voice-player">
-              <button
-                className="play-voice-btn"
+              <button 
+                className="play-voice-btn" 
                 onClick={() => state.playingVoiceMessage === message.id ? stopVoiceMessage() : playVoiceMessage(message.id, message.voiceUrl!)}
               >
                 <i className={`fas ${state.playingVoiceMessage === message.id ? 'fa-pause' : 'fa-play'}`}></i>
               </button>
               <div className="voice-waveform">
-                <div
-                  className="voice-wave"
-                  style={{
+                <div 
+                  className="voice-wave" 
+                  style={{ 
                     width: state.playingVoiceMessage === message.id ? '100%' : '80%',
                     animation: state.playingVoiceMessage === message.id ? 'wave 1.5s ease-in-out infinite' : 'none'
                   }}
@@ -1949,7 +1798,7 @@ export default function ChatsPage() {
 
         {/* Your Story - Only show if user has stories */}
         {yourStory.storyCount > 0 && (
-          <div
+          <div 
             key={yourStory.id}
             className={`story ${yourStory.isMyStory ? 'my-story' : ''} ${yourStory.isSeen ? 'seen-story' : ''}`}
             onClick={() => openStory(yourStory.id)}
@@ -1973,7 +1822,7 @@ export default function ChatsPage() {
 
         {/* Other Stories */}
         {stories.filter(story => !story.isMyStory).map(story => (
-          <div
+          <div 
             key={story.id}
             className={`story ${story.isMyStory ? 'my-story' : ''} ${story.isSeen ? 'seen-story' : ''}`}
             onClick={() => openStory(story.id)}
@@ -2003,7 +1852,7 @@ export default function ChatsPage() {
       <div className="muted-stories-section">
         <div className="stories-container">
           {stories.map(story => (
-            <div
+            <div 
               key={story.id}
               className="story muted-story"
               onClick={() => openStory(story.id)}
@@ -2046,13 +1895,13 @@ export default function ChatsPage() {
     return (
       <div className="requests-tabs">
         <div className="tabs-header">
-          <button
+          <button 
             className={`tab-button ${state.requestsActiveTab === 'requests' ? 'active' : ''}`}
             onClick={() => setRequestsActiveTab('requests')}
           >
             Requests
           </button>
-          <button
+          <button 
             className={`tab-button ${state.requestsActiveTab === 'pending' ? 'active' : ''}`}
             onClick={() => setRequestsActiveTab('pending')}
           >
@@ -2148,29 +1997,46 @@ export default function ChatsPage() {
 
     return (
       <div className="search-results">
-        {state.searchResults.length > 0 ?
+        {state.searchResults.length > 0 ? 
           state.searchResults.map((result, index) => {
-            // For chats section
+            // For chats section - show chat items exactly as they appear in main list
             if (state.activeSection === 'chats') {
               const chat = result as Chat;
               return (
-                <div
+                <div 
                   key={chat.id}
                   className={`search-result-item ${state.isMobile ? 'mobile-chat-item' : 'chat-item'}`}
                   onClick={() => handleChatClick(chat.id)}
                 >
-                  {/* ... existing chat rendering code ... */}
+                  <div className={`${state.isMobile ? 'mobile-chat-avatar' : 'chat-avatar'}`}>
+                    <img src={chat.avatar} alt={chat.name} />
+                    {chat.isOnline && <div className={`${state.isMobile ? 'mobile-online-indicator' : 'online-indicator'}`}></div>}
+                  </div>
+                  <div className={`${state.isMobile ? 'mobile-chat-info' : 'chat-content'}`}>
+                    <div className={`${state.isMobile ? 'mobile-chat-header' : 'chat-header'}`}>
+                      <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>{chat.name}</span>
+                      <span className={`${state.isMobile ? 'mobile-chat-time' : 'chat-time'}`}>{chat.time}</span>
+                    </div>
+                    <div className={`${state.isMobile ? 'mobile-chat-preview' : 'chat-preview'}`}>
+                      <span className={`${state.isMobile ? 'mobile-last-message' : 'chat-preview-text'}`}>
+                        {chat.lastMessage}
+                      </span>
+                      {chat.unread > 0 && (
+                        <span className={`${state.isMobile ? 'mobile-unread-badge' : 'unread-badge'}`}>
+                          {chat.unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             }
-
-            // For requests section - UPDATED FOR API RESULTS
+            
+            // For requests section - show users with "Send Request" button
             else if (state.activeSection === 'requests') {
               const user = result;
-              const isConnected = state.chats.some(chat =>
-                chat.name.toLowerCase() === user.name.toLowerCase()
-              );
-
+              const isConnected = isUserConnected(user.name);
+              
               return (
                 <div key={user.id} className="search-result-item">
                   <div className={`chat-item ${state.isMobile ? 'mobile-chat-item' : ''}`}>
@@ -2179,31 +2045,19 @@ export default function ChatsPage() {
                     </div>
                     <div className={`${state.isMobile ? 'mobile-chat-info' : 'chat-content'}`}>
                       <div className={`${state.isMobile ? 'mobile-chat-header' : 'chat-header'}`}>
-                        <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>
-                          {user.name}
-                          {user.username && (
-                            <span className="username" style={{ fontSize: '12px', color: '#65676B', marginLeft: '8px' }}>
-                              @{user.username}
-                            </span>
-                          )}
-                        </span>
+                        <span className={`${state.isMobile ? 'mobile-chat-name' : 'chat-name'}`}>{user.name}</span>
                       </div>
                       <div className={`${state.isMobile ? 'mobile-chat-preview' : 'chat-preview'}`}>
                         <span>
-                          {isConnected
-                            ? "Already connected"
-                            : user.bio || "Click to send friend request"
+                          {isConnected 
+                            ? "Already connected" 
+                            : "Click to send friend request"
                           }
-                          {user.friends && user.friends.length > 0 && (
-                            <span style={{ fontSize: '11px', color: '#1877f2', marginLeft: '8px' }}>
-                              {user.friends.length} friends
-                            </span>
-                          )}
                         </span>
                       </div>
                     </div>
                     {!isConnected && (
-                      <button
+                      <button 
                         className="send-request-btn"
                         onClick={() => openSendRequestModal(user)}
                       >
@@ -2211,9 +2065,8 @@ export default function ChatsPage() {
                       </button>
                     )}
                     {isConnected && (
-                      <button
+                      <button 
                         className="send-request-btn connected-btn"
-                        style={{ backgroundColor: '#e4e6eb', color: '#65676B' }}
                         disabled
                       >
                         Connected
@@ -2223,8 +2076,8 @@ export default function ChatsPage() {
                 </div>
               );
             }
-
-            // For other sections
+            
+            // For other sections (notifications, archived)
             else {
               return (
                 <div key={index} className="search-result-item">
@@ -2264,14 +2117,14 @@ export default function ChatsPage() {
               <div className="mobile-header-content">
                 <div className="mobile-header-title">
                   {state.activeSection === 'chats' ? 'Messenger' :
-                    state.activeSection === 'notifications' ? 'Notifications' :
-                      state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
+                   state.activeSection === 'notifications' ? 'Notifications' :
+                   state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
                 </div>
                 <div className="mobile-header-actions">
                   <i className="fas fa-edit"></i>
-                  <img
-                    src={profileAvatar}
-                    alt="Profile"
+                  <img 
+                    src={profileAvatar} 
+                    alt="Profile" 
                     className="mobile-profile-pic"
                     onClick={() => window.location.href = '/profile'}
                   />
@@ -2328,32 +2181,32 @@ export default function ChatsPage() {
                 <div className="mobile-message-input-container">
                   <div className="mobile-message-input">
                     <div className="input-container">
-                      <i
-                        className="fas fa-microphone"
+                      <i 
+                        className="fas fa-microphone" 
                         id="microphoneButton"
                         onClick={handleMicrophoneClick}
                       ></i>
-                      <i
-                        className="fas fa-paperclip"
+                      <i 
+                        className="fas fa-paperclip" 
                         id="attachButton"
                         onClick={toggleAttachmentMenu}
                       ></i>
-                      <input
-                        type="text"
-                        id="messageInput"
+                      <input 
+                        type="text" 
+                        id="messageInput" 
                         placeholder="Type a message"
                         value={state.newMessage}
                         onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
                         onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                       />
                       <div className="input-actions">
-                        <i
-                          className="fas fa-smile"
+                        <i 
+                          className="fas fa-smile" 
                           id="emojiButton"
                           onClick={toggleEmojiPicker}
                         ></i>
-                        <i
-                          className="fas fa-thumbs-up"
+                        <i 
+                          className="fas fa-thumbs-up" 
                           id="likeButton"
                           onClick={sendThumbEmoji}
                         ></i>
@@ -2375,7 +2228,7 @@ export default function ChatsPage() {
                     {state.showEmojiPicker && (
                       <div className="emoji-picker active">
                         {popularEmojis.map((emoji, index) => (
-                          <div
+                          <div 
                             key={index}
                             className="emoji-option"
                             onClick={() => addEmoji(emoji)}
@@ -2392,10 +2245,10 @@ export default function ChatsPage() {
                         <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
                           <i className="fas fa-image"></i>
                           <span>Photo</span>
-                          <input
-                            id="photoInput"
-                            type="file"
-                            className="file-input"
+                          <input 
+                            id="photoInput" 
+                            type="file" 
+                            className="file-input" 
                             accept="image/*"
                             onChange={(e) => handleFileUpload(e, 'image')}
                           />
@@ -2403,10 +2256,10 @@ export default function ChatsPage() {
                         <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
                           <i className="fas fa-film"></i>
                           <span>Video</span>
-                          <input
-                            id="videoInput"
-                            type="file"
-                            className="file-input"
+                          <input 
+                            id="videoInput" 
+                            type="file" 
+                            className="file-input" 
                             accept="video/*"
                             onChange={(e) => handleFileUpload(e, 'video')}
                           />
@@ -2427,9 +2280,9 @@ export default function ChatsPage() {
                 <div className="search-bar">
                   <div className="search-container">
                     <i className="fas fa-search"></i>
-                    <input
-                      type="text"
-                      placeholder="Search Messenger"
+                    <input 
+                      type="text" 
+                      placeholder="Search Messenger" 
                       value={state.searchQuery}
                       onChange={(e) => handleSearch(e.target.value)}
                     />
@@ -2466,7 +2319,7 @@ export default function ChatsPage() {
                       {state.activeSection === 'chats' && (
                         <div className="mobile-chats-list">
                           {state.chats.map(chat => (
-                            <div
+                            <div 
                               key={chat.id}
                               className="mobile-chat-item"
                               data-chat-id={chat.id}
@@ -2498,7 +2351,7 @@ export default function ChatsPage() {
                       {state.activeSection === 'notifications' && (
                         <div className="notifications-list">
                           {state.notifications.map(notification => (
-                            <div
+                            <div 
                               key={notification.id}
                               className="notification-item"
                               onClick={() => markNotificationAsRead(notification.id)}
@@ -2541,7 +2394,7 @@ export default function ChatsPage() {
                       {state.activeSection === 'archived' && (
                         <div className="archived-list">
                           {state.archivedChats.map(chat => (
-                            <div
+                            <div 
                               key={chat.id}
                               className="archived-item"
                               data-chat-id={chat.id}
@@ -2577,14 +2430,14 @@ export default function ChatsPage() {
           {!state.activeChat && (
             <div className="mobile-bottom-nav">
               <div className="mobile-nav-items">
-                <div
+                <div 
                   className={`mobile-nav-item ${state.activeSection === 'chats' ? 'active' : ''}`}
                   onClick={() => setActiveSection('chats')}
                 >
                   <i className="fas fa-comment"></i>
                   <span>Chats</span>
                 </div>
-                <div
+                <div 
                   className={`mobile-nav-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
                   onClick={() => setActiveSection('notifications')}
                 >
@@ -2594,7 +2447,7 @@ export default function ChatsPage() {
                     <div className="mobile-nav-indicator"></div>
                   )}
                 </div>
-                <div
+                <div 
                   className={`mobile-nav-item ${state.activeSection === 'requests' ? 'active' : ''}`}
                   onClick={() => setActiveSection('requests')}
                 >
@@ -2604,7 +2457,7 @@ export default function ChatsPage() {
                     <div className="mobile-nav-indicator"></div>
                   )}
                 </div>
-                <div
+                <div 
                   className={`mobile-nav-item ${state.activeSection === 'archived' ? 'active' : ''}`}
                   onClick={() => setActiveSection('archived')}
                 >
@@ -2623,14 +2476,14 @@ export default function ChatsPage() {
           {/* Left Sidebar Icons */}
           <div className="left-sidebar">
             <div className="sidebar-icons">
-              <div
+              <div 
                 className={`icon-item ${state.activeSection === 'chats' ? 'active' : ''}`}
                 onClick={() => setActiveSection('chats')}
               >
                 <i className="fas fa-comment"></i>
                 <div className="icon-tooltip">Chats</div>
               </div>
-              <div
+              <div 
                 className={`icon-item ${state.activeSection === 'notifications' ? 'active' : ''}`}
                 onClick={() => setActiveSection('notifications')}
               >
@@ -2640,7 +2493,7 @@ export default function ChatsPage() {
                   <div className="notification-indicator"></div>
                 )}
               </div>
-              <div
+              <div 
                 className={`icon-item ${state.activeSection === 'requests' ? 'active' : ''}`}
                 onClick={() => setActiveSection('requests')}
               >
@@ -2650,7 +2503,7 @@ export default function ChatsPage() {
                   <div className="notification-indicator"></div>
                 )}
               </div>
-              <div
+              <div 
                 className={`icon-item ${state.activeSection === 'archived' ? 'active' : ''}`}
                 onClick={() => setActiveSection('archived')}
               >
@@ -2667,10 +2520,10 @@ export default function ChatsPage() {
           {/* Chats/Notifications/Requests/Archived Sidebar */}
           <div className="chats-sidebar">
             <div className="sidebar-header">
-              <h2 className="messenger-title" style={{ color: '#1877f2' }}>
+              <h2 className="messenger-title" style={{color: '#1877f2'}}>
                 {state.activeSection === 'chats' ? 'Messenger' :
-                  state.activeSection === 'notifications' ? 'Notifications' :
-                    state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
+                 state.activeSection === 'notifications' ? 'Notifications' :
+                 state.activeSection === 'requests' ? 'Friend Request' : 'Archived chats'}
               </h2>
               <div className="header-icons">
                 <i className="fas fa-edit" style={{ display: state.activeSection === 'chats' ? 'block' : 'none' }}></i>
@@ -2681,9 +2534,9 @@ export default function ChatsPage() {
             <div className="search-bar">
               <div className="search-container">
                 <i className="fas fa-search"></i>
-                <input
-                  type="text"
-                  placeholder="Search Messenger"
+                <input 
+                  type="text" 
+                  placeholder="Search Messenger" 
                   value={state.searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                 />
@@ -2721,7 +2574,7 @@ export default function ChatsPage() {
                     <div className="chats-section">
                       <div className="chats-list">
                         {state.chats.map(chat => (
-                          <div
+                          <div 
                             key={chat.id}
                             className={`chat-item ${chat.id === state.activeChat?.id ? 'active' : ''}`}
                             onClick={() => handleChatClick(chat.id)}
@@ -2752,7 +2605,7 @@ export default function ChatsPage() {
                     <div className="notifications-section">
                       <div className="notifications-list">
                         {state.notifications.map(notification => (
-                          <div
+                          <div 
                             key={notification.id}
                             className={`notification-item ${notification.isNew ? 'new' : ''}`}
                             onClick={() => markNotificationAsRead(notification.id)}
@@ -2797,7 +2650,7 @@ export default function ChatsPage() {
                     <div className="archived-section">
                       <div className="archived-list">
                         {state.archivedChats.map(chat => (
-                          <div
+                          <div 
                             key={chat.id}
                             className="archived-item"
                             onClick={() => handleChatClick(chat.id)}
@@ -2864,32 +2717,32 @@ export default function ChatsPage() {
 
                 <div className="message-input">
                   <div className="input-container">
-                    <i
-                      className="fas fa-microphone"
+                    <i 
+                      className="fas fa-microphone" 
                       id="microphoneButton"
                       onClick={handleMicrophoneClick}
                     ></i>
-                    <i
-                      className="fas fa-paperclip"
+                    <i 
+                      className="fas fa-paperclip" 
                       id="attachButton"
                       onClick={toggleAttachmentMenu}
                     ></i>
-                    <input
-                      type="text"
-                      id="messageInput"
+                    <input 
+                      type="text" 
+                      id="messageInput" 
                       placeholder="Type a message"
                       value={state.newMessage}
                       onChange={(e) => setState(prev => ({ ...prev, newMessage: e.target.value }))}
                       onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                     />
                     <div className="input-actions">
-                      <i
-                        className="fas fa-smile"
+                      <i 
+                        className="fas fa-smile" 
                         id="emojiButton"
                         onClick={toggleEmojiPicker}
                       ></i>
-                      <i
-                        className="fas fa-thumbs-up"
+                      <i 
+                        className="fas fa-thumbs-up" 
                         id="likeButton"
                         onClick={sendThumbEmoji}
                       ></i>
@@ -2911,7 +2764,7 @@ export default function ChatsPage() {
                   {state.showEmojiPicker && (
                     <div className="emoji-picker active">
                       {popularEmojis.map((emoji, index) => (
-                        <div
+                        <div 
                           key={index}
                           className="emoji-option"
                           onClick={() => addEmoji(emoji)}
@@ -2928,10 +2781,10 @@ export default function ChatsPage() {
                       <div className="attachment-option" onClick={() => document.getElementById('photoInput')?.click()}>
                         <i className="fas fa-image"></i>
                         <span>Photo</span>
-                        <input
-                          id="photoInput"
-                          type="file"
-                          className="file-input"
+                        <input 
+                          id="photoInput" 
+                          type="file" 
+                          className="file-input" 
                           accept="image/*"
                           onChange={(e) => handleFileUpload(e, 'image')}
                         />
@@ -2939,10 +2792,10 @@ export default function ChatsPage() {
                       <div className="attachment-option" onClick={() => document.getElementById('videoInput')?.click()}>
                         <i className="fas fa-film"></i>
                         <span>Video</span>
-                        <input
-                          id="videoInput"
-                          type="file"
-                          className="file-input"
+                        <input 
+                          id="videoInput" 
+                          type="file" 
+                          className="file-input" 
                           accept="video/*"
                           onChange={(e) => handleFileUpload(e, 'video')}
                         />
@@ -2991,25 +2844,14 @@ export default function ChatsPage() {
             </div>
             <div className="modal-body">
               <div className="request-chat-box">
-                <textarea
+                <textarea 
                   placeholder="Type a message to send with your friend request..."
                   value={state.requestMessage}
                   onChange={(e) => setState(prev => ({ ...prev, requestMessage: e.target.value }))}
                 />
               </div>
-              <button
-                className="send-request-button"
-                onClick={sendFriendRequest}
-                disabled={state.isSendingRequest || !state.requestMessage.trim()}
-              >
-                {state.isSendingRequest ? (
-                  <>
-                    <i className="fas fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
-                    Sending...
-                  </>
-                ) : (
-                  'Send Request'
-                )}
+              <button className="send-request-button" onClick={sendFriendRequest}>
+                Send Request
               </button>
             </div>
           </div>
@@ -3024,11 +2866,11 @@ export default function ChatsPage() {
             <div className="story-progress">
               {Array.from({ length: currentStory.storyCount }, (_, i) => (
                 <div key={i} className="progress-segment">
-                  <div
+                  <div 
                     className={`progress-fill ${i === state.currentStoryItemIndex ? 'active' : i < state.currentStoryItemIndex ? 'completed' : ''}`}
-                    style={{
-                      width: i === state.currentStoryItemIndex ? `${state.storyProgress}%` :
-                        i < state.currentStoryItemIndex ? '100%' : '0%'
+                    style={{ 
+                      width: i === state.currentStoryItemIndex ? `${state.storyProgress}%` : 
+                             i < state.currentStoryItemIndex ? '100%' : '0%' 
                     }}
                   ></div>
                 </div>
@@ -3037,10 +2879,10 @@ export default function ChatsPage() {
 
             {/* Story Header */}
             <div className="story-header">
-              <img
-                src={currentStory.avatar}
-                alt=""
-                className="story-header-avatar"
+              <img 
+                src={currentStory.avatar} 
+                alt="" 
+                className="story-header-avatar" 
               />
               <div className="story-header-info">
                 <div className="story-user-name">{currentStory.name}</div>
@@ -3071,7 +2913,7 @@ export default function ChatsPage() {
             {/* Story Media */}
             <div className="story-media">
               {isVideo ? (
-                <video
+                <video 
                   ref={videoRef}
                   src={currentMediaUrl}
                   autoPlay
@@ -3081,9 +2923,9 @@ export default function ChatsPage() {
                   onEnded={nextStoryItem}
                 />
               ) : (
-                <img
-                  src={currentMediaUrl}
-                  alt=""
+                <img 
+                  src={currentMediaUrl} 
+                  alt="" 
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 />
               )}
@@ -3101,9 +2943,9 @@ export default function ChatsPage() {
               <>
                 {state.showStoryMessageBox ? (
                   <div className="story-message-box">
-                    <input
-                      type="text"
-                      className="story-message-input"
+                    <input 
+                      type="text" 
+                      className="story-message-input" 
                       placeholder="Send message..."
                       value={state.storyMessage}
                       onChange={(e) => setState(prev => ({ ...prev, storyMessage: e.target.value }))}
@@ -3122,7 +2964,7 @@ export default function ChatsPage() {
 
             {/* Delete Story Option for Your Story */}
             {isYourStory && (
-              <button
+              <button 
                 className="delete-story-btn"
                 onClick={() => deleteStory(yourStory.id)}
                 style={{
@@ -3149,7 +2991,7 @@ export default function ChatsPage() {
       {/* Context Menus */}
       {/* Chat Context Menu */}
       {state.contextMenu.visible && (
-        <div
+        <div 
           className={`chat-context-menu ${state.contextMenu.visible ? 'active' : ''}`}
           style={{
             position: 'fixed',
@@ -3191,7 +3033,7 @@ export default function ChatsPage() {
 
       {/* Story Context Menu */}
       {state.storyContextMenu.visible && (
-        <div
+        <div 
           className={`story-context-menu ${state.storyContextMenu.visible ? 'active' : ''}`}
           style={{
             position: 'fixed',
@@ -3229,20 +3071,20 @@ export default function ChatsPage() {
           <div className="call-interface-overlay"></div>
           <div className="call-interface">
             <div className="call-header">
-              <img
-                src={state.callState.callRecipient?.avatar || 'https://i.pravatar.cc/150?img=1'}
-                alt=""
-                className="call-user-avatar"
+              <img 
+                src={state.callState.callRecipient?.avatar || 'https://i.pravatar.cc/150?img=1'} 
+                alt="" 
+                className="call-user-avatar" 
               />
               <h2 className="call-user-name">{state.callState.callRecipient?.name || 'Unknown'}</h2>
               <p className="call-status">
                 {state.callState.isOutgoingCall ? 'Ringing...' :
-                  state.callState.isCallActive ? 'Connected' :
-                    'Call Ended'}
+                 state.callState.isCallActive ? 'Connected' :
+                 'Call Ended'}
               </p>
               {(state.callState.isCallActive || (state.callState.isCallEnded && state.callState.totalCallTime > 0)) && (
                 <p className="call-timer">
-                  {state.callState.isCallActive ?
+                  {state.callState.isCallActive ? 
                     formatCallDuration(state.callState.callDuration) :
                     `Call Duration: ${formatCallDuration(state.callState.totalCallTime)}`}
                 </p>
@@ -3251,13 +3093,13 @@ export default function ChatsPage() {
 
             {state.callState.isCallActive && (
               <div className="call-options">
-                <button
+                <button 
                   className={`call-option-btn ${state.callState.isMuted ? 'active' : ''}`}
                   onClick={toggleMute}
                 >
                   <i className={`fas ${state.callState.isMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
                 </button>
-                <button
+                <button 
                   className={`call-option-btn ${state.callState.isSpeakerOn ? 'active' : ''}`}
                   onClick={toggleSpeaker}
                 >

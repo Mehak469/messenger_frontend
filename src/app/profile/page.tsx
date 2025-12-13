@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react'
 import { authFetch } from "../../utils/authfetch"
 import './profile.css'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL="http://127.0.0.1:8000/api/v1"
+
 
 interface UserProfile {
   _id: string;
@@ -76,7 +78,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error loading profile:', error)
       // Fallback to localStorage data if available
-      const storedUser = localStorage.getItem('userData')
+      const storedUser = localStorage.getItem('user')
       if (storedUser) {
         const userData = JSON.parse(storedUser)
         const profileData: ProfileState = {
@@ -112,8 +114,11 @@ export default function ProfilePage() {
       }
 
       const res = await authFetch(`${API_BASE_URL}/users/me`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData)
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
       })
 
       if (!res.ok) {
@@ -130,7 +135,7 @@ export default function ProfilePage() {
         avatar: profileState.avatar,
         bio: profileState.bio
       }
-      localStorage.setItem('userData', JSON.stringify(currentUserData))
+      localStorage.setItem('user', JSON.stringify(currentUserData))
       
       setOriginalProfile({ ...profileState })
       alert('Profile updated successfully!')
@@ -166,7 +171,7 @@ export default function ProfilePage() {
       // Clear all auth data from localStorage
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
-      localStorage.removeItem('userData')
+      localStorage.removeItem('user')
       
       // Redirect to auth page
       window.location.href = '/auth'
