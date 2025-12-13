@@ -98,3 +98,103 @@ export const getSentFriendRequestsAPI = async () => {
     return [];
   }
 };
+export const cancelFriendRequestAPI = async (requestId: string) => {
+  try {
+    const response = await authFetch(
+      `${API_BASE_URL}/friends/request/${requestId}/cancel`,
+      {
+        method: 'POST'
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to cancel request');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Cancel friend request error:', error);
+    throw error;
+  }
+};
+// Get pending friend requests (requests received from others)
+export const getPendingFriendRequestsAPI = async () => {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/friends/requests/pending`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.error('Get pending requests failed:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data; // Returns array of pending friend requests
+  } catch (error) {
+    console.error('Get pending requests API error:', error);
+    return [];
+  }
+};
+
+// Accept a friend request
+export const acceptFriendRequestAPI = async (requestId: string) => {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/friends/request/${requestId}/accept`, {
+      method: 'POST',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to accept friend request');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    throw error;
+  }
+};
+
+// Reject a friend request
+export const rejectFriendRequestAPI = async (requestId: string) => {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/friends/request/${requestId}/reject`, {
+      method: 'POST',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to reject friend request');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Reject friend request error:', error);
+    throw error;
+  }
+};
+
+// Get all friends of the current user
+export const getFriendsAPI = async () => {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/friends`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.error('Get friends failed:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data; // Returns array of friends
+  } catch (error) {
+    console.error('Get friends API error:', error);
+    return [];
+  }
+};
