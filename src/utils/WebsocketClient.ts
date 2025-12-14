@@ -70,9 +70,24 @@ export class WebSocketClient {
   // --------------------------
   // Convenience methods
   // --------------------------
-  sendMessage(conversation_id: string, receiver_id: string, content: string, temp_id?: string) {
-    this.send("send_message", { conversation_id, receiver_id, content, temp_id });
+  sendMessage(
+    conversation_id: string,
+    receiver_id: string,
+    content: string = "",
+    message_type: string = "text",
+    attachments: string[] = [],
+    temp_id?: string
+  ) {
+    this.send("send_message", {
+      conversation_id,
+      receiver_id,
+      content,
+      attachments,
+      message_type,
+      temp_id
+    });
   }
+  
 
   markDelivered(conversation_id: string, sender_id: string) {
     this.send("mark_delivered", { conversation_id, sender_id });

@@ -78,7 +78,15 @@ export default function MessageItem({
             </video>
             <div className="media-status">
               <span className="message-time">{message.time}</span>
-              {message.isUser && <i className={`fas fa-check-double status-icon ${message.status === 'seen' ? 'read' : ''}`}></i>}
+              {message.isUser && (
+                <i
+                  className={`fas ${message.status === 'sent' ? 'fa-check' : // single tick
+                      message.status === 'delivered' ? 'fa-check-double' : // double tick
+                        message.status === 'seen' ? 'fa-check-double read' : '' // blue tick
+                    } status-icon`}
+                ></i>
+              )}
+
             </div>
           </div>
         )}
@@ -129,7 +137,15 @@ export default function MessageItem({
         <p className="message-text">{message.text}</p>
         <div className="message-meta">
           <span className="message-time">{message.time}</span>
-          {message.isUser && <i className={`fas fa-check-double status-icon ${message.status === 'seen' ? 'read' : ''}`}></i>}
+          {message.isUser && (
+            <i
+              className={`fas ${message.status === 'sent' ? 'fa-check' : // single tick
+                message.status === 'delivered' ? 'fa-check-double' : // double tick
+                  message.status === 'seen' ? 'fa-check-double read' : '' // blue tick
+                } status-icon`}
+            ></i>
+          )}
+
         </div>
       </div>
     </div>

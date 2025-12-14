@@ -28,6 +28,7 @@ import NotificationsList from '@/components/chats/NotificationsList'
 import Sidebar from '@/components/chats/Sidebar'
 import ChatHeader from '@/components/chats/ChatHeader'
 import { fetchMessages } from '@/services/fetchMessages'
+import { useWebSocket } from '@/contexts/WebSocketContext'
 
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -152,6 +153,8 @@ const popularEmojis = [
 ];
 
 export default function ChatsPage() {
+  const wsClient = useWebSocket();
+
   const [state, setState] = useState<AppState>({
     activeSection: 'chats',
     callState: {
@@ -278,6 +281,7 @@ export default function ChatsPage() {
       return 'Just now';
     }
   };
+
 
   // Helper function to convert string ID to number (simple hash)
   const stringIdToNumber = (str: string): number => {
@@ -763,7 +767,7 @@ export default function ChatsPage() {
 
   // messages 
   useEffect(() => {
-    console.log("active chat ",state.activeChat)
+    console.log("active chat ", state.activeChat)
     console.log("returning from fetching msgs")
     if (!state.activeChat?.conv_id) return; // stop if undefined
     console.log("entered into fetching msgs")
@@ -781,6 +785,38 @@ export default function ChatsPage() {
 
     loadMessages();
   }, [state.activeChat]);
+
+
+  //mark delivered and mark seen
+  useEffect(() => {
+    if (!wsClient || !state.chats?.length) return;
+  
+    // Send markDelivered only once (for all conversations collectively)
+    // Assuming backend handles it per conversation if needed
+    wsClient.markDelivered('all', 'all'); // or handle according to your wsClient API
+  
+    // If there is an active chat, mark all as seen and reset unread locally
+    if (state.activeChat) {
+      const { conv_id: activeConvId, id: activeSenderId } = state.activeChat;
+  
+      wsClient.markSeenAll(activeConvId, activeSenderId.toString());
+  
+      
+      setState(prev => {
+        // If activeChat exists, update its unread and corresponding chat in chats array
+        if (!prev.activeChat) return prev;
+  
+        return {
+          ...prev,
+          chats: prev.chats.map(c =>
+            c.conv_id === prev.activeChat!.conv_id ? { ...c, unread: 0 } : c
+          ),
+          activeChat: { ...prev.activeChat, unread: 0 }
+        };
+      });
+    }
+  }, [state.activeChat?.conv_id, wsClient]);
+  
 
 
   // Helper functions
@@ -838,50 +874,48 @@ export default function ChatsPage() {
   };
 
   const sendMessage = () => {
-    if (!state.newMessage.trim()) return;
+    if (!state.newMessage.trim() || !state.activeChat) return;
+    console.log("enetred send message")
+
+    if (!wsClient) return; // ensure websocket is ready
+    console.log("ok websocket available for message send")
 
     const currentTime = getCurrentTime();
+    const localId = state.messages.length + 1;
 
+    // Local message for immediate UI update
     const newMsg: FetchedMessage = {
-      id: state.messages.length + 1,
+      id: localId,
       text: state.newMessage,
       time: currentTime,
       isUser: true,
       type: "text",
-      status: "sent"
+      status: "sending" // will be updated when backend confirms
     };
 
-    const updatedMessages = [...state.messages, newMsg];
+    console.log("send message :", newMsg)
 
+    // Update local state
     setState(prev => ({
       ...prev,
-      messages: updatedMessages,
+      messages: [...prev.messages, newMsg],
       newMessage: ""
     }));
 
-    reorderChats(state.activeChat!.id, state.newMessage, currentTime);
+    // Update last message in chats
+    reorderChats(state.activeChat.id, state.newMessage, currentTime);
 
-    setTimeout(() => {
-      const replyText = getRandomReply();
-      const replyTime = getCurrentTime();
-
-      const replyMsg: FetchedMessage = {
-        id: updatedMessages.length + 1,
-        text: replyText,
-        time: replyTime,
-        isUser: false,
-        type: "text",
-        status: "sent"
-      };
-
-      setState(prev => ({
-        ...prev,
-        messages: [...updatedMessages, replyMsg]
-      }));
-
-      reorderChats(state.activeChat!.id, replyText, replyTime);
-    }, 1000);
+    // Send message via websocket
+    wsClient.sendMessage(
+      state.activeChat.conv_id,      // conversation_id
+      String(state.activeChat.id),   // receiver_id
+      state.newMessage,              // content
+      "text",                        // message_type
+      [],                             // attachments
+      String(localId)                // temp_id
+    );
   };
+
 
 
   const getCurrentTime = () => {
@@ -1762,38 +1796,38 @@ export default function ChatsPage() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-  
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const currentTime = getCurrentTime();
         const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
-  
+
         const newMsg: FetchedMessage = {
           id: state.messages.length + 1,
-          text:"",
+          text: "",
           mediaUrl: event.target?.result as string,
           time: currentTime,
           isUser: true,
           type: mediaType,
           status: 'sent'
         };
-  
+
         const updatedMessages = [...state.messages, newMsg];
         setState(prev => ({
           ...prev,
           messages: updatedMessages
         }));
-  
+
         const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
         reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
       };
       reader.readAsDataURL(file);
     };
     input.click();
-  
+
     setState(prev => ({ ...prev, showAttachmentMenu: false }));
   };
-  
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, mediaType: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1805,12 +1839,12 @@ export default function ChatsPage() {
         id: state.messages.length + 1,
         mediaUrl: event.target?.result as string,
         time: currentTime,
-        text:"",
+        text: "",
         isUser: true,
         type: mediaType === 'image' ? 'image' : 'video',
         status: 'sent'
       };
-      
+
 
       const updatedMessages = [...state.messages, newMsg];
       setState(prev => ({
@@ -1821,7 +1855,7 @@ export default function ChatsPage() {
       const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
       reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
 
-   
+
     };
     reader.readAsDataURL(file);
 
@@ -2029,6 +2063,92 @@ export default function ChatsPage() {
     return <div className="messenger-container">Loading...</div>;
   }
 
+
+////
+
+  wsClient?.on('new_message', (data: any) => {
+    const msg = data.message;
+
+    setState(prev => {
+      const transformedMsg: FetchedMessage = {
+        id: msg.id,                     // backend ID
+        text: msg.content || '',
+        mediaUrl: msg.attachments?.[0], // optional media URL
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isUser: false,                   // received message
+        type: msg.message_type,
+        status: msg.status,
+      };
+
+      // 1️⃣ Active chat check
+      const isActiveChat = prev.activeChat?.conv_id === msg.conversation_id;
+
+      // 2️⃣ Update messages for active chat
+      const updatedMessages = isActiveChat
+        ? [...prev.messages, transformedMsg]
+        : prev.messages;
+
+      // 3️⃣ Update chats array
+      const updatedChats = prev.chats.map(chat => {
+        if (chat.conv_id === msg.conversation_id) {
+          const lastMessage =
+            msg.message_type === 'text'
+              ? msg.content
+              : 'Media has been received';
+
+          const newUnread = isActiveChat ? chat.unread : (chat.unread || 0) + 1;
+
+          return {
+            ...chat,
+            messages: [...chat.messages, transformedMsg],
+            unread: newUnread,
+            lastMessage,
+            time: transformedMsg.time,
+          };
+        }
+        return chat;
+      });
+
+      return {
+        ...prev,
+        messages: updatedMessages,
+        chats: updatedChats,
+      };
+    });
+
+    // --------------------------
+    // WebSocket status updates
+    // --------------------------
+    wsClient.markDelivered(msg.conversation_id, msg.sender_id);
+
+    if (state.activeChat?.conv_id === msg.conversation_id) {
+      wsClient.markSeenAll(msg.conversation_id, msg.sender_id);
+    }
+  });
+
+
+  wsClient?.on("message_status", (data) => {
+    const { status, conversation_id } = data;
+
+    if (state.activeChat?.conv_id !== conversation_id) return;
+
+    setState(prev => {
+      const updatedMessages = prev.messages.map(msg => {
+        if (
+          msg.isUser &&
+          ((msg.status === "sent" && (status === "delivered" || status === "seen")) ||
+            (msg.status === "delivered" && status === "seen"))
+        ) {
+          return { ...msg, status };
+        }
+        return msg;
+      });
+      return { ...prev, messages: updatedMessages };
+    });
+  });
+
+
+
   return (
     <div className="messenger-container">
       {/* Mobile Layout */}
@@ -2099,8 +2219,7 @@ export default function ChatsPage() {
                   <div className="mobile-message-input">
                     <MessageInput
                       newMessage={state.newMessage}
-                      isRecording={state.isRecording}
-                      recordingTime={state.recordingTime}
+                      receiverName={state.activeChat.name}
                       showEmojiPicker={state.showEmojiPicker}
                       showAttachmentMenu={state.showAttachmentMenu}
                       onMessageChange={(message) => setState(prev => ({ ...prev, newMessage: message }))}
@@ -2108,12 +2227,9 @@ export default function ChatsPage() {
                       onSendThumbEmoji={sendThumbEmoji}
                       onToggleEmojiPicker={toggleEmojiPicker}
                       onToggleAttachmentMenu={toggleAttachmentMenu}
-                      onMicrophoneClick={handleMicrophoneClick}
-                      onStopRecording={stopRecording}
                       onAddEmoji={addEmoji}
                       onFileUpload={handleFileUpload}
                       onOpenCamera={openCamera}
-                      formatCallDuration={formatCallDuration}
                       popularEmojis={popularEmojis}
                     />
                   </div>
@@ -2493,8 +2609,7 @@ export default function ChatsPage() {
 
                 <MessageInput
                   newMessage={state.newMessage}
-                  isRecording={state.isRecording}
-                  recordingTime={state.recordingTime}
+                  receiverName={state.activeChat.name}
                   showEmojiPicker={state.showEmojiPicker}
                   showAttachmentMenu={state.showAttachmentMenu}
                   onMessageChange={(message) => setState(prev => ({ ...prev, newMessage: message }))}
@@ -2502,12 +2617,9 @@ export default function ChatsPage() {
                   onSendThumbEmoji={sendThumbEmoji}
                   onToggleEmojiPicker={toggleEmojiPicker}
                   onToggleAttachmentMenu={toggleAttachmentMenu}
-                  onMicrophoneClick={handleMicrophoneClick}
-                  onStopRecording={stopRecording}
                   onAddEmoji={addEmoji}
                   onFileUpload={handleFileUpload}
                   onOpenCamera={openCamera}
-                  formatCallDuration={formatCallDuration}
                   popularEmojis={popularEmojis}
                 />
               </div>

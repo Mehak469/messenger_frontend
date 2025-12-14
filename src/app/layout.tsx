@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistrar from "./ServiceWorkerRegistrar";
-import { WebSocketProvider } from "../components/main/WebsocketProvider"; // Client component
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,11 +25,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+        <link
+          rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-        <WebSocketProvider /> {/* ✅ client-side logic here */}
+        <WebSocketProvider>
+          {children} {/* ✅ now all children can access the socket context */}
+        </WebSocketProvider>
         <ServiceWorkerRegistrar />
       </body>
     </html>

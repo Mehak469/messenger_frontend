@@ -3,8 +3,7 @@ import React from 'react'
 
 interface MessageInputProps {
   newMessage: string
-  isRecording: boolean
-  recordingTime: number
+  receiverName:string
   showEmojiPicker: boolean
   showAttachmentMenu: boolean
   onMessageChange: (message: string) => void
@@ -12,19 +11,15 @@ interface MessageInputProps {
   onSendThumbEmoji: () => void
   onToggleEmojiPicker: () => void
   onToggleAttachmentMenu: () => void
-  onMicrophoneClick: () => void
-  onStopRecording: () => void
   onAddEmoji: (emoji: string) => void
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>, mediaType: string) => void
   onOpenCamera: () => void
-  formatCallDuration: (seconds: number) => string
   popularEmojis: string[]
 }
 
 export default function MessageInput({
   newMessage,
-  isRecording,
-  recordingTime,
+  receiverName,
   showEmojiPicker,
   showAttachmentMenu,
   onMessageChange,
@@ -32,22 +27,14 @@ export default function MessageInput({
   onSendThumbEmoji,
   onToggleEmojiPicker,
   onToggleAttachmentMenu,
-  onMicrophoneClick,
-  onStopRecording,
   onAddEmoji,
   onFileUpload,
   onOpenCamera,
-  formatCallDuration,
   popularEmojis
 }: MessageInputProps) {
   return (
     <div className="message-input">
       <div className="input-container">
-        <i
-          className="fas fa-microphone"
-          id="microphoneButton"
-          onClick={onMicrophoneClick}
-        ></i>
         <i
           className="fas fa-paperclip"
           id="attachButton"
@@ -74,17 +61,6 @@ export default function MessageInput({
           ></i>
         </div>
       </div>
-
-      {/* Recording Indicator */}
-      {isRecording && (
-        <div className="recording-indicator">
-          <div className="recording-pulse"></div>
-          <span className="recording-text">Recording... {formatCallDuration(recordingTime)}</span>
-          <button className="stop-recording-btn" onClick={onStopRecording}>
-            <i className="fas fa-stop"></i>
-          </button>
-        </div>
-      )}
 
       {/* Emoji Picker */}
       {showEmojiPicker && (
@@ -135,4 +111,3 @@ export default function MessageInput({
     </div>
   )
 }
-
