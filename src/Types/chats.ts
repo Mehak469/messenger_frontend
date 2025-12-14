@@ -1,14 +1,17 @@
-export interface Chat {
-  id: number;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  isOnline: boolean;
-  isActive?: boolean;
-  messages: Message[];
+export type Chat = {
+  id: number
+  conv_id: string
+  name: string
+  avatar: string
+  lastMessage: string
+  time: string
+  unread: number
+  isOnline?: boolean   // ✅ add this
+  isActive?: boolean   // ✅ add this
+  messages: FetchedMessage[] // ✅ FIX
 }
+
+
 export interface SelectedUser {
   id: string;
   name: string;
@@ -40,7 +43,19 @@ export interface Message {
   voiceUrl?: string;
   duration?: number;
   mediaType?: string;
+  status?: string;
 }
+
+export interface FetchedMessage {
+  id: number;           // local index for rendering
+  text: string;         // always a string
+  mediaUrl?: string;    // only for media
+  time: string;         // formatted time
+  isUser: boolean;
+  type: string;
+  status: string;
+}
+
 
 export interface Story {
   id: number;
@@ -125,7 +140,7 @@ export interface AppState {
   archivedChats: any[];
   notifications: Notification[];
   activeChat: Chat | null;
-  messages: Message[];
+  messages: FetchedMessage[];
   newMessage: string;
   showAttachmentMenu: boolean;
   showEmojiPicker: boolean;

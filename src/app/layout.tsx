@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistrar from "./ServiceWorkerRegistrar";
+import { WebSocketProvider } from "../components/main/WebsocketProvider"; // Client component
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,9 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>
@@ -30,6 +29,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
+        <WebSocketProvider /> {/* ✅ client-side logic here */}
         <ServiceWorkerRegistrar />
       </body>
     </html>

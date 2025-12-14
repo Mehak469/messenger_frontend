@@ -6,14 +6,18 @@ const API_BASE_URL="http://127.0.0.1:8000/api/v1"
 export const getConversationsAPI = async () => {
   try {
     const response = await authFetch(`${API_BASE_URL}/conversations`);
-    
+
     if (!response.ok) {
-      throw new Error('Failed to fetch conversations');
+      throw new Error("Failed to fetch conversations");
     }
-    
-    return await response.json();
+
+    const data = await response.json();
+
+    console.log("🟢 [API] Raw conversations response:", data);
+
+    return data;
   } catch (error) {
-    console.error('Error fetching conversations:', error);
+    console.error("🔴 [API] Error fetching conversations:", error);
     throw error;
   }
 };

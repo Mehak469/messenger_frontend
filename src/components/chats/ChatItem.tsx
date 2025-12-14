@@ -23,10 +23,11 @@ export default function ChatItem({
   onChatTouchEnd,
   type = 'chat'
 }: ChatItemProps) {
-  const className = isMobile 
-    ? 'mobile-chat-item' 
-    : type === 'archived' 
-      ? 'archived-item' 
+
+  const className = isMobile
+    ? 'mobile-chat-item'
+    : type === 'archived'
+      ? 'archived-item'
       : 'chat-item'
 
   return (
@@ -38,10 +39,12 @@ export default function ChatItem({
       onTouchStart={(e) => onChatTouchStart(chat.id, type, e)}
       onTouchEnd={onChatTouchEnd}
     >
+      {/* Avatar */}
       <div className={isMobile ? 'mobile-chat-avatar' : type === 'archived' ? 'archived-avatar' : 'chat-avatar'}>
         <img src={chat.avatar} alt={chat.name} />
-        {chat.isOnline && <div className={isMobile ? 'mobile-online-indicator' : 'online-indicator'}></div>}
       </div>
+
+      {/* Info */}
       <div className={isMobile ? 'mobile-chat-info' : type === 'archived' ? 'archived-content' : 'chat-content'}>
         <div className={isMobile ? 'mobile-chat-header' : type === 'archived' ? 'archived-header' : 'chat-header'}>
           <span className={isMobile ? 'mobile-chat-name' : type === 'archived' ? 'archived-name' : 'chat-name'}>
@@ -51,10 +54,12 @@ export default function ChatItem({
             {chat.time}
           </span>
         </div>
+
         <div className={isMobile ? 'mobile-chat-preview' : type === 'archived' ? 'archived-preview' : 'chat-preview'}>
           <span className={isMobile ? 'mobile-last-message' : type === 'archived' ? 'archived-preview-text' : 'chat-preview-text'}>
             {chat.lastMessage || 'No messages yet'}
           </span>
+
           {chat.unread > 0 && (
             <span className={isMobile ? 'mobile-unread-badge' : 'unread-badge'}>
               {chat.unread}
@@ -65,4 +70,3 @@ export default function ChatItem({
     </div>
   )
 }
-

@@ -10,9 +10,9 @@ import {
   getPendingFriendRequestsAPI,
   acceptFriendRequestAPI,
   rejectFriendRequestAPI,
-  } from '../../services/friendsapi'
+} from '../../services/friendsapi'
 import { getConversationsAPI } from '../../services/conversationapi'
-import { Chat,SelectedUser,SentRequest,Message,Story,Notification,CallState,Friend,AppState } from '../../Types/chats'
+import { Chat, SelectedUser, SentRequest, FetchedMessage, Message, Story, Notification, CallState, Friend, AppState } from '../../Types/chats'
 import StoriesList from '@/components/chats/StoriesList'
 import MutedStoriesList from '@/components/chats/MutedStoriesList'
 import StoryViewer from '@/components/chats/StoryViewer'
@@ -27,61 +27,12 @@ import SearchResults from '@/components/chats/SearchResults'
 import NotificationsList from '@/components/chats/NotificationsList'
 import Sidebar from '@/components/chats/Sidebar'
 import ChatHeader from '@/components/chats/ChatHeader'
+import { fetchMessages } from '@/services/fetchMessages'
+
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_BASE_URL="http://127.0.0.1:8000/api/v1"
+const API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 
-
-
-// Initial data - REMOVED Irfan Shameer from chats
-const initialChatsData: Chat[] = [
-  {
-    id: 1,
-    name: "Elliz Ladla",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    lastMessage: "That's interesting!",
-    time: "16:07",
-    unread: 0,
-    isOnline: true,
-    messages: []
-  },
-  {
-    id: 2,
-    name: "Noor",
-    avatar: "https://i.pravatar.cc/150?img=1",
-    lastMessage: "Nice!",
-    time: "16:06",
-    unread: 0,
-    isOnline: true,
-    isActive: true,
-    messages: [
-      { id: 1, text: "Kia hua h", time: "11:20 AM", isUser: false, type: 'text' },
-      { id: 2, text: "Wei", time: "11:20 AM", isUser: true, type: 'text' },
-      { id: 3, text: "You changed the theme to Classic", time: "Change", isUser: false, type: 'notification' },
-      { id: 4, text: "As", time: "11:22 AM", isUser: false, type: 'text' }
-    ]
-  },
-  {
-    id: 3,
-    name: "Buddy",
-    avatar: "https://i.pravatar.cc/150?img=2",
-    lastMessage: "You sent an attachment",
-    time: "1w",
-    unread: 0,
-    isOnline: false,
-    messages: []
-  },
-  {
-    id: 4,
-    name: "Hassan Raza",
-    avatar: "https://i.pravatar.cc/150?img=4",
-    lastMessage: "Messages and calls are secured with end-to-end...",
-    time: "5w",
-    unread: 0,
-    isOnline: false,
-    messages: []
-  }
-];
 
 const initialStoriesData: Story[] = [
   {
@@ -269,13 +220,13 @@ export default function ChatsPage() {
     showChatContextMenu: false,
     showStoryOptionsMenu: false,
     longPressTimer: null,
-    isSendingRequest: false,   
-    isLoadingUser: false,     
-    isSearching: false,     
+    isSendingRequest: false,
+    isLoadingUser: false,
+    isSearching: false,
     sentRequests: [],
-    receivedRequests: [], 
-    friends: [], 
-    isLoadingFriends: false, 
+    receivedRequests: [],
+    friends: [],
+    isLoadingFriends: false,
 
   });
 
@@ -299,360 +250,316 @@ export default function ChatsPage() {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to format time
-const formatTime = (dateString: string): string => {
-  if (!dateString) return 'Just now';
-  
-  try {
-    // Handle both ISO strings and "Just now" strings
-    if (dateString === 'Just now') return 'Just now';
-    
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    const diffWeeks = Math.floor(diffDays / 7);
+  const formatTime = (dateString: string): string => {
+    if (!dateString) return 'Just now';
 
-    if (diffSecs < 60) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    if (diffWeeks < 4) return `${diffWeeks}w`;
-    
-    // For older dates, show date
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch (error) {
-    return 'Just now';
-  }
-};
+    try {
+      // Handle both ISO strings and "Just now" strings
+      if (dateString === 'Just now') return 'Just now';
 
-// Helper function to convert string ID to number (simple hash)
-const stringIdToNumber = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-};
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      const diffWeeks = Math.floor(diffDays / 7);
 
-// Function to load conversations from API
-const loadConversations = async (): Promise<Chat[]> => {
-  try {
-    // Get current user ID from localStorage
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      console.error('No user data found');
-      return [];
+      if (diffSecs < 60) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m`;
+      if (diffHours < 24) return `${diffHours}h`;
+      if (diffDays < 7) return `${diffDays}d`;
+      if (diffWeeks < 4) return `${diffWeeks}w`;
+
+      // For older dates, show date
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (error) {
+      return 'Just now';
     }
+  };
 
-    const parsedUserData = JSON.parse(userData);
-    const currentUserId = parsedUserData._id;
-
-    if (!currentUserId) {
-      console.error('No user ID found');
-      return [];
+  // Helper function to convert string ID to number (simple hash)
+  const stringIdToNumber = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
     }
+    return Math.abs(hash);
+  };
 
-    // Fetch conversations from API
-    const response = await getConversationsAPI();
-    
-    if (!response || !response.conversations) {
-      console.error('Invalid response from conversations API');
-      return [];
-    }
+  // Function to load conversations from API
+  const loadConversations = async (): Promise<Chat[]> => {
+    try {
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        console.error("❌ No user data found");
+        return [];
+      }
 
-    // Transform each conversation to Chat format
-    const chatPromises = response.conversations.map(async (conv: any) => {
-      try {
-        // Find the receiver (participant that's not the current user)
-        const receiverId = conv.participants.find(
-          (participantId: string) => participantId !== currentUserId
-        );
+      const parsedUserData = JSON.parse(userData);
+      const currentUserId = parsedUserData._id;
 
-        if (!receiverId) {
-          console.warn('No receiver found for conversation:', conv._id);
+      console.log("🟢 Current User ID:", currentUserId);
+
+      const response = await getConversationsAPI();
+
+      console.log("🟡 Raw conversations API response:", response);
+
+      if (!response || !Array.isArray(response.conversations)) {
+        console.error("❌ Invalid conversations format:", response);
+        return [];
+      }
+
+      const chats: Chat[] = response.conversations.map((conv: any, index: number) => {
+        console.log(`🟣 Processing conversation ${index}:`, conv);
+
+        const participant = conv.participant;
+
+        if (!participant) {
+          console.warn("⚠️ Missing participant in conversation:", conv);
           return null;
         }
 
-        // Fetch receiver user details
-        const receiverUser = await getUserByIdAPI(receiverId);
+        console.log("🟢 Participant data:", participant);
 
-        // Get unread count for current user
-        const unreadCount = conv.unread_counts?.[currentUserId] || 0;
-
-        // Format last message time
-        const lastMessageTime = conv.last_message_time 
-          ? formatTime(conv.last_message_time) 
-          : formatTime(conv.created_at);
-
-        // Convert conversation ID to number
-        const chatId = stringIdToNumber(conv._id);
-
-        // Create Chat object with original conversation data for sorting
-        const chat: Chat & { _sortTime?: string } = {
-          id: chatId,
-          name: receiverUser?.name || 'Unknown User',
-          avatar: receiverUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(receiverUser?.name || 'User')}&background=1877f2&color=fff&size=200`,
-          lastMessage: conv.last_message || '',
-          time: lastMessageTime,
-          unread: unreadCount,
-          isOnline: false, // TODO: Implement online status if available
-          messages: [], // Messages will be loaded separately when chat is opened
-          _sortTime: conv.last_message_time || conv.created_at // Store for sorting
+        const chat: Chat = {
+          id: participant.id,
+          conv_id: conv.conversation_id,
+          name: participant.name ?? "Unknown User",
+          avatar:
+            participant.avatar ??
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              participant.name ?? "User"
+            )}&background=1877f2&color=fff&size=200`,
+          lastMessage: conv.last_message ?? "",
+          time: conv.last_message_time
+            ? formatTime(conv.last_message_time)
+            : "",
+          unread: conv.unread_count ?? 0,
+          isOnline: false,
+          messages: [],
         };
 
+        console.log("✅ Final Chat Object:", chat);
         return chat;
-      } catch (error) {
-        console.error('Error processing conversation:', conv._id, error);
-        return null;
+      }).filter(Boolean) as Chat[];
+
+      console.log("🔵 Final chats array:", chats);
+
+      return chats;
+    } catch (error) {
+      console.error("🔴 Error loading conversations:", error);
+      return [];
+    }
+  };
+
+  const cancelSentRequest = async (requestId: string) => {
+    try {
+      // Optimistic UI (optional but recommended)
+      setState(prev => ({
+        ...prev,
+        sentRequests: prev.sentRequests.filter(req => req.id !== requestId)
+      }));
+
+      const response = await cancelFriendRequestAPI(requestId);
+
+      if (response.message !== 'Friend request cancelled') {
+        throw new Error('Unexpected cancel response');
       }
-    });
 
-    const chats = await Promise.all(chatPromises);
+    } catch (error) {
+      console.error('Cancel request failed:', error);
 
-    // Filter out null values and sort by last_message_time (most recent first)
-    const validChats = chats.filter((chat): chat is Chat & { _sortTime?: string } => chat !== null);
-    
-    // Sort by last_message_time (most recent first)
-    validChats.sort((a, b) => {
-      const timeA = a._sortTime;
-      const timeB = b._sortTime;
-
-      if (!timeA && !timeB) return 0;
-      if (!timeA) return 1;
-      if (!timeB) return -1;
-      
-      return new Date(timeB).getTime() - new Date(timeA).getTime();
-    });
-
-    // Remove the temporary _sortTime property
-    return validChats.map(({ _sortTime, ...chat }) => chat);
-  } catch (error) {
-    console.error('Error loading conversations:', error);
-    return [];
-  }
-};
-const cancelSentRequest = async (requestId: string) => {
-  try {
-    // Optimistic UI (optional but recommended)
-    setState(prev => ({
-      ...prev,
-      sentRequests: prev.sentRequests.filter(req => req.id !== requestId)
-    }));
-
-    const response = await cancelFriendRequestAPI(requestId);
-
-    if (response.message !== 'Friend request cancelled') {
-      throw new Error('Unexpected cancel response');
+      // Rollback UI if API fails
+      await reloadSentRequests();
+      alert('Failed to cancel friend request');
     }
+  };
+  // Function to load incoming friend requests
+  const loadIncomingRequests = async () => {
+    try {
+      const incomingRequests = await getPendingFriendRequestsAPI();
 
-  } catch (error) {
-    console.error('Cancel request failed:', error);
+      console.log('Incoming requests from API:', incomingRequests); // Debug log
 
-    // Rollback UI if API fails
-    await reloadSentRequests();
-    alert('Failed to cancel friend request');
-  }
-};
-// Function to load incoming friend requests
-const loadIncomingRequests = async () => {
-  try {
-    const incomingRequests = await getPendingFriendRequestsAPI();
-    
-    console.log('Incoming requests from API:', incomingRequests); // Debug log
-    
-    // Enrich with user details
-    const enrichedRequests = await Promise.all(
-      incomingRequests.map(async (req: any) => {
-        try {
-          // Fetch sender details
-          const user = await getUserByIdAPI(req.sender_id);
-          
-          return {
-            id: req._id, // Request ID from API
-            senderId: req.sender_id,
-            name: user?.name || 'Unknown User',
-            avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
-            message: req.message || 'Hi, I\'d like to connect with you!',
-            time: formatTime(req.created_at),
-            status: req.status || 'Pending'
-          };
-        } catch (userError) {
-          console.error('Failed to fetch user for request:', userError);
-          return {
-            id: req._id,
-            senderId: req.sender_id,
-            name: 'Unknown User',
-            avatar: 'https://i.pravatar.cc/150?img=1',
-            message: req.message || 'Hi, I\'d like to connect with you!',
-            time: formatTime(req.created_at),
-            status: req.status || 'Pending'
-          };
-        }
-      })
-    );
-    
-    setState(prev => ({
-      ...prev,
-      receivedRequests: enrichedRequests
-    }));
-    
-  } catch (error) {
-    console.error('Failed to load incoming requests:', error);
-    setState(prev => ({
-      ...prev,
-      receivedRequests: []
-    }));
-  }
-};
-const reloadSentRequests = async () => {
-  try {
-    const sentRequests = await getSentFriendRequestsAPI();
+      // Enrich with user details
+      const enrichedRequests = await Promise.all(
+        incomingRequests.map(async (req: any) => {
+          try {
+            // Fetch sender details
+            const user = await getUserByIdAPI(req.sender_id);
 
-    // Sort by creation date (newest first)
-    const sortedRequests = sentRequests.sort((a: any, b: any) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+            return {
+              id: req._id, // Request ID from API
+              senderId: req.sender_id,
+              name: user?.name || 'Unknown User',
+              avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
+              message: req.message || 'Hi, I\'d like to connect with you!',
+              time: formatTime(req.created_at),
+              status: req.status || 'Pending'
+            };
+          } catch (userError) {
+            console.error('Failed to fetch user for request:', userError);
+            return {
+              id: req._id,
+              senderId: req.sender_id,
+              name: 'Unknown User',
+              avatar: 'https://i.pravatar.cc/150?img=1',
+              message: req.message || 'Hi, I\'d like to connect with you!',
+              time: formatTime(req.created_at),
+              status: req.status || 'Pending'
+            };
+          }
+        })
+      );
 
-    const enriched = await Promise.all(
-      sortedRequests.map(async (req: any) => {
-        try {
-          const user = await getUserByIdAPI(req.receiver_id);
-          return {
-            id: req._id,
-            receiverId: req.receiver_id,
-            name: user?.name || 'Unknown User',
-            avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
-            message: req.message || 'Hi, I\'d like to connect with you!',
-            time: formatTime(req.created_at),
-            status: req.status || 'Pending'
-          };
-        } catch (userError) {
-          console.error('Failed to fetch user:', userError);
-          return {
-            id: req._id,
-            receiverId: req.receiver_id,
-            name: 'Unknown User',
-            avatar: 'https://i.pravatar.cc/150?img=1',
-            message: req.message || 'Hi, I\'d like to connect with you!',
-            time: formatTime(req.created_at),
-            status: req.status || 'Pending'
-          };
-        }
-      })
-    );
+      setState(prev => ({
+        ...prev,
+        receivedRequests: enrichedRequests
+      }));
 
-    setState(prev => ({
-      ...prev,
-      sentRequests: enriched
-    }));
-
-  } catch (error) {
-    console.error('Failed to load sent requests:', error);
-    // Keep existing sent requests if API fails
-  }
-};
-// Function to accept a friend request
-const acceptFriendRequest = async (requestId: string) => {
-  try {
-    // Find the request to get user info before removing
-    const request = state.receivedRequests.find(req => req.id === requestId);
-    if (!request) {
-      console.error('Request not found');
-      return;
+    } catch (error) {
+      console.error('Failed to load incoming requests:', error);
+      setState(prev => ({
+        ...prev,
+        receivedRequests: []
+      }));
     }
-    
-    // Optimistic UI update - remove from list immediately
-    setState(prev => ({
-      ...prev,
-      receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
-    }));
-    
-    // Call the API
-    const response = await acceptFriendRequestAPI(requestId);
-    
-    console.log('Accept response:', response);
-    
-    // If successful, create a new chat with this user
-    const newChat: Chat = {
-      id: Date.now(), // Temporary ID, you might want to use real user ID
-      name: request.name,
-      avatar: request.avatar,
-      lastMessage: "You are now friends!",
-      time: 'Just now',
-      unread: 0,
-      isOnline: true,
-      isActive: true,
-      messages: [
-        {
-          id: 1,
-          text: `Hi! I'm ${request.name}. Thanks for accepting my friend request!`,
-          time: 'Now',
-          isUser: false,
-          type: 'text'
-        },
-        {
-          id: 2,
-          text: "You are now connected as friends",
-          time: "Now",
-          isUser: false,
-          type: 'notification'
-        }
-      ]
-    };
-    
-    // Add the new chat to the chats list
-    setState(prev => ({
-      ...prev,
-      chats: [newChat, ...prev.chats]
-    }));
-    
-    // Optional: Show success message
-    alert(`You are now friends with ${request.name}!`);
-    
-  } catch (error) {
-    console.error('Failed to accept friend request:', error);
-    
-    // Rollback on error - reload the requests
-    alert('Failed to accept friend request');
-    await loadIncomingRequests();
-  }
-};
+  };
+  const reloadSentRequests = async () => {
+    try {
+      const sentRequests = await getSentFriendRequestsAPI();
 
-// Function to reject a friend request
-const rejectFriendRequest = async (requestId: string) => {
-  try {
-    // Find the request to get user info for feedback
-    const request = state.receivedRequests.find(req => req.id === requestId);
-    
-    // Optimistic UI update - remove from list immediately
-    setState(prev => ({
-      ...prev,
-      receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
-    }));
-    
-    // Call the API
-    const response = await rejectFriendRequestAPI(requestId);
-    
-    console.log('Reject response:', response);
-    
-    // Optional: Show feedback
-    if (request) {
-      alert(`Friend request from ${request.name} has been rejected.`);
+      // Sort by creation date (newest first)
+      const sortedRequests = sentRequests.sort((a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      const enriched = await Promise.all(
+        sortedRequests.map(async (req: any) => {
+          try {
+            const user = await getUserByIdAPI(req.receiver_id);
+            return {
+              id: req._id,
+              receiverId: req.receiver_id,
+              name: user?.name || 'Unknown User',
+              avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
+              message: req.message || 'Hi, I\'d like to connect with you!',
+              time: formatTime(req.created_at),
+              status: req.status || 'Pending'
+            };
+          } catch (userError) {
+            console.error('Failed to fetch user:', userError);
+            return {
+              id: req._id,
+              receiverId: req.receiver_id,
+              name: 'Unknown User',
+              avatar: 'https://i.pravatar.cc/150?img=1',
+              message: req.message || 'Hi, I\'d like to connect with you!',
+              time: formatTime(req.created_at),
+              status: req.status || 'Pending'
+            };
+          }
+        })
+      );
+
+      setState(prev => ({
+        ...prev,
+        sentRequests: enriched
+      }));
+
+    } catch (error) {
+      console.error('Failed to load sent requests:', error);
+      // Keep existing sent requests if API fails
     }
-    
-  } catch (error) {
-    console.error('Failed to reject friend request:', error);
-    
-    // Rollback on error - reload the requests
-    alert('Failed to reject friend request');
-    await loadIncomingRequests();
-  }
-};
+  };
+  // Function to accept a friend request
+  const acceptFriendRequest = async (requestId: string) => {
+    try {
+      // Find the request to get user info before removing
+      const request = state.receivedRequests.find(req => req.id === requestId);
+      if (!request) {
+        console.error('Request not found');
+        return;
+      }
+
+      // Optimistic UI update - remove from list immediately
+      setState(prev => ({
+        ...prev,
+        receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
+      }));
+
+      // Call the API
+      const response = await acceptFriendRequestAPI(requestId);
+
+      console.log('Accept response:', response);
+
+      // If successful, create a new chat with this user
+      const newChat: Chat = {
+        id: Date.now(), // Temporary ID, you might want to use real user ID
+        conv_id: response.conv_id,
+        name: request.name,
+        avatar: request.avatar,
+        lastMessage: "You are now friends!",
+        time: 'Just now',
+        unread: 0,
+        isOnline: true,
+        isActive: true,
+        messages: [
+        ]
+      };
+
+      // Add the new chat to the chats list
+      setState(prev => ({
+        ...prev,
+        chats: [newChat, ...prev.chats]
+      }));
+
+      // Optional: Show success message
+      alert(`You are now friends with ${request.name}!`);
+
+    } catch (error) {
+      console.error('Failed to accept friend request:', error);
+
+      // Rollback on error - reload the requests
+      alert('Failed to accept friend request');
+      await loadIncomingRequests();
+    }
+  };
+
+  // Function to reject a friend request
+  const rejectFriendRequest = async (requestId: string) => {
+    try {
+      // Find the request to get user info for feedback
+      const request = state.receivedRequests.find(req => req.id === requestId);
+
+      // Optimistic UI update - remove from list immediately
+      setState(prev => ({
+        ...prev,
+        receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
+      }));
+
+      // Call the API
+      const response = await rejectFriendRequestAPI(requestId);
+
+      console.log('Reject response:', response);
+
+      // Optional: Show feedback
+      if (request) {
+        alert(`Friend request from ${request.name} has been rejected.`);
+      }
+
+    } catch (error) {
+      console.error('Failed to reject friend request:', error);
+
+      // Rollback on error - reload the requests
+      alert('Failed to reject friend request');
+      await loadIncomingRequests();
+    }
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -713,40 +620,40 @@ const rejectFriendRequest = async (requestId: string) => {
     }
   }, []);
 
- useEffect(() => {
-  const loadSentRequests = async () => {
-    try {
-      const sentRequests = await getSentFriendRequestsAPI();
+  useEffect(() => {
+    const loadSentRequests = async () => {
+      try {
+        const sentRequests = await getSentFriendRequestsAPI();
 
-      const enrichedRequests = await Promise.all(
-        sentRequests.map(async (req: any) => {
-          // Fetch receiver details
-          const user = await getUserByIdAPI(req.receiver_id);
+        const enrichedRequests = await Promise.all(
+          sentRequests.map(async (req: any) => {
+            // Fetch receiver details
+            const user = await getUserByIdAPI(req.receiver_id);
 
-          return {
-            id: req._id,
-            receiverId: req.receiver_id,
-            name: user?.name || 'Unknown User',
-            avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
-            message: req.message,
-            time: formatTime(req.created_at),
-            status: 'Pending'
-          };
-        })
-      );
+            return {
+              id: req._id,
+              receiverId: req.receiver_id,
+              name: user?.name || 'Unknown User',
+              avatar: user?.avatar || 'https://i.pravatar.cc/150?img=1',
+              message: req.message,
+              time: formatTime(req.created_at),
+              status: 'Pending'
+            };
+          })
+        );
 
-      setState(prev => ({
-        ...prev,
-        sentRequests: enrichedRequests
-      }));
+        setState(prev => ({
+          ...prev,
+          sentRequests: enrichedRequests
+        }));
 
-    } catch (error) {
-      console.error('Failed to load sent requests:', error);
-    }
-  };
+      } catch (error) {
+        console.error('Failed to load sent requests:', error);
+      }
+    };
 
-  loadSentRequests();
-}, []);
+    loadSentRequests();
+  }, []);
 
 
   // Close context menus when clicking outside
@@ -853,6 +760,29 @@ const rejectFriendRequest = async (requestId: string) => {
     }
   }, [state.isRecording]);
 
+
+  // messages 
+  useEffect(() => {
+    console.log("active chat ",state.activeChat)
+    console.log("returning from fetching msgs")
+    if (!state.activeChat?.conv_id) return; // stop if undefined
+    console.log("entered into fetching msgs")
+    const loadMessages = async () => {
+      try {
+        const messages = await fetchMessages(state.activeChat?.conv_id || ''); // conv_id is string now
+        setState(prev => ({
+          ...prev,
+          messages
+        }));
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      }
+    };
+
+    loadMessages();
+  }, [state.activeChat]);
+
+
   // Helper functions
   const setActiveSection = (section: string) => {
     setState(prev => ({
@@ -911,12 +841,14 @@ const rejectFriendRequest = async (requestId: string) => {
     if (!state.newMessage.trim()) return;
 
     const currentTime = getCurrentTime();
-    const newMsg: Message = {
+
+    const newMsg: FetchedMessage = {
       id: state.messages.length + 1,
       text: state.newMessage,
       time: currentTime,
       isUser: true,
-      type: 'text'
+      type: "text",
+      status: "sent"
     };
 
     const updatedMessages = [...state.messages, newMsg];
@@ -924,7 +856,7 @@ const rejectFriendRequest = async (requestId: string) => {
     setState(prev => ({
       ...prev,
       messages: updatedMessages,
-      newMessage: ''
+      newMessage: ""
     }));
 
     reorderChats(state.activeChat!.id, state.newMessage, currentTime);
@@ -932,12 +864,14 @@ const rejectFriendRequest = async (requestId: string) => {
     setTimeout(() => {
       const replyText = getRandomReply();
       const replyTime = getCurrentTime();
-      const replyMsg: Message = {
+
+      const replyMsg: FetchedMessage = {
         id: updatedMessages.length + 1,
         text: replyText,
         time: replyTime,
         isUser: false,
-        type: 'text'
+        type: "text",
+        status: "sent"
       };
 
       setState(prev => ({
@@ -948,6 +882,7 @@ const rejectFriendRequest = async (requestId: string) => {
       reorderChats(state.activeChat!.id, replyText, replyTime);
     }, 1000);
   };
+
 
   const getCurrentTime = () => {
     const now = new Date();
@@ -1445,54 +1380,9 @@ const rejectFriendRequest = async (requestId: string) => {
   const handleStoryMessageSend = () => {
     if (!state.storyMessage.trim()) return;
 
-    const isYourStory = state.currentStoryIndex === -1;
+    alert("Will deal later");
 
-    if (isYourStory) return;
-
-    const currentStory = state.stories[state.currentStoryIndex];
-    if (!currentStory.isMyStory) {
-      const storyUserChat = state.chats.find(chat =>
-        chat.name.toLowerCase().includes(currentStory.name.toLowerCase())
-      );
-
-      if (storyUserChat) {
-        const currentTime = getCurrentTime();
-        const storyReplyMessage: Message = {
-          id: storyUserChat.messages.length + 1,
-          text: state.storyMessage,
-          time: currentTime,
-          isUser: true,
-          type: 'text'
-        };
-
-        const updatedMessages = [...storyUserChat.messages, storyReplyMessage];
-
-        setState(prev => ({
-          ...prev,
-          chats: prev.chats.map(chat =>
-            chat.id === storyUserChat.id ? {
-              ...chat,
-              messages: updatedMessages,
-              lastMessage: state.storyMessage,
-              time: currentTime
-            } : chat
-          )
-        }));
-
-        reorderChats(storyUserChat.id, state.storyMessage, currentTime);
-
-        if (state.activeChat?.id === storyUserChat.id) {
-          setState(prev => ({
-            ...prev,
-            messages: updatedMessages
-          }));
-        }
-
-        closeStory();
-        handleChatClick(storyUserChat.id);
-      }
-    }
-
+    // Reset story message and close input
     setState(prev => ({
       ...prev,
       storyMessage: '',
@@ -1500,6 +1390,7 @@ const rejectFriendRequest = async (requestId: string) => {
       isStoryPlaying: true
     }));
   };
+
 
   const handleChatRightClick = (e: React.MouseEvent, chatId: number, type: string = 'chat') => {
     e.preventDefault();
@@ -1534,6 +1425,7 @@ const rejectFriendRequest = async (requestId: string) => {
     if (chatToArchive) {
       const archivedChat = {
         id: chatToArchive.id,
+        conv_id: chatToArchive.conv_id,
         name: chatToArchive.name,
         avatar: chatToArchive.avatar,
         lastMessage: chatToArchive.lastMessage,
@@ -1561,6 +1453,7 @@ const rejectFriendRequest = async (requestId: string) => {
     if (chatToUnarchive) {
       const newChat: Chat = {
         id: chatToUnarchive.id,
+        conv_id: chatToUnarchive.conv_id,
         name: chatToUnarchive.name,
         avatar: chatToUnarchive.avatar,
         lastMessage: chatToUnarchive.lastMessage,
@@ -1709,13 +1602,15 @@ const rejectFriendRequest = async (requestId: string) => {
   // ===== UPDATED: Thumb emoji send function =====
   const sendThumbEmoji = () => {
     const currentTime = getCurrentTime();
-    const likeMessage: Message = {
+    const likeMessage: FetchedMessage = {
       id: state.messages.length + 1,
       text: "👍",
       time: currentTime,
       isUser: true,
-      type: 'like'
+      type: 'like',
+      status: 'sent' // required field in FetchedMessage
     };
+
 
     const updatedMessages = [...state.messages, likeMessage];
     setState(prev => ({
@@ -1765,15 +1660,16 @@ const rejectFriendRequest = async (requestId: string) => {
         const audioUrl = URL.createObjectURL(audioBlob);
 
         const currentTime = getCurrentTime();
-        const voiceMessage: Message = {
+        const voiceMessage: FetchedMessage = {
           id: state.messages.length + 1,
           text: "Voice message",
           time: currentTime,
           isUser: true,
           type: 'voice',
-          voiceUrl: audioUrl,
-          duration: state.recordingTime
+          status: 'sent',          // required
+          mediaUrl: audioUrl       // use mediaUrl for voice file
         };
+
 
         const updatedMessages = [...state.messages, voiceMessage];
         setState(prev => ({
@@ -1866,57 +1762,38 @@ const rejectFriendRequest = async (requestId: string) => {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-
+  
       const reader = new FileReader();
       reader.onload = (event) => {
         const currentTime = getCurrentTime();
         const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
-
-        const newMsg: Message = {
+  
+        const newMsg: FetchedMessage = {
           id: state.messages.length + 1,
-          text: '',
-          content: event.target?.result as string,
+          text:"",
+          mediaUrl: event.target?.result as string,
           time: currentTime,
           isUser: true,
-          type: mediaType === 'image' ? 'image' : 'video',
-          mediaType: mediaType
+          type: mediaType,
+          status: 'sent'
         };
-
+  
         const updatedMessages = [...state.messages, newMsg];
         setState(prev => ({
           ...prev,
           messages: updatedMessages
         }));
-
+  
         const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
         reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
-
-        setTimeout(() => {
-          const replyText = "Nice! 👍";
-          const replyTime = getCurrentTime();
-          const replyMsg: Message = {
-            id: updatedMessages.length + 1,
-            text: replyText,
-            time: replyTime,
-            isUser: false,
-            type: 'text'
-          };
-
-          setState(prev => ({
-            ...prev,
-            messages: [...updatedMessages, replyMsg]
-          }));
-
-          reorderChats(state.activeChat!.id, replyText, replyTime);
-        }, 1500);
       };
       reader.readAsDataURL(file);
     };
     input.click();
-
+  
     setState(prev => ({ ...prev, showAttachmentMenu: false }));
   };
-
+  
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, mediaType: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1924,15 +1801,16 @@ const rejectFriendRequest = async (requestId: string) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const currentTime = getCurrentTime();
-      const newMsg: Message = {
+      const newMsg: FetchedMessage = {
         id: state.messages.length + 1,
-        text: '',
-        content: event.target?.result as string,
+        mediaUrl: event.target?.result as string,
         time: currentTime,
+        text:"",
         isUser: true,
         type: mediaType === 'image' ? 'image' : 'video',
-        mediaType: mediaType
+        status: 'sent'
       };
+      
 
       const updatedMessages = [...state.messages, newMsg];
       setState(prev => ({
@@ -1943,24 +1821,7 @@ const rejectFriendRequest = async (requestId: string) => {
       const mediaText = mediaType === 'image' ? 'a photo' : 'a video';
       reorderChats(state.activeChat!.id, `Sent ${mediaText}`, currentTime);
 
-      setTimeout(() => {
-        const replyText = "Nice! 👍";
-        const replyTime = getCurrentTime();
-        const replyMsg: Message = {
-          id: updatedMessages.length + 1,
-          text: replyText,
-          time: replyTime,
-          isUser: false,
-          type: 'text'
-        };
-
-        setState(prev => ({
-          ...prev,
-          messages: [...updatedMessages, replyMsg]
-        }));
-
-        reorderChats(state.activeChat!.id, replyText, replyTime);
-      }, 1500);
+   
     };
     reader.readAsDataURL(file);
 
@@ -1969,140 +1830,87 @@ const rejectFriendRequest = async (requestId: string) => {
   };
 
   // New functions for message requests
- const setRequestsActiveTab = async (tab: string) => {
-  setState(prev => ({
-    ...prev,
-    requestsActiveTab: tab,
-    searchQuery: '',
-    searchResults: []
-  }));
+  const setRequestsActiveTab = async (tab: string) => {
+    setState(prev => ({
+      ...prev,
+      requestsActiveTab: tab,
+      searchQuery: '',
+      searchResults: []
+    }));
 
-  // Load appropriate data based on tab
-  if (tab === 'pending') {
-    await reloadSentRequests();
-  } else if (tab === 'requests') {
-    await loadIncomingRequests();
-  }
-};
-  const acceptRequest = (requestId: number) => {
-    const request = state.receivedRequests.find(req => req.id === requestId);
-    if (request) {
-      const newChat: Chat = {
-        id: Date.now(),
-        name: request.name,
-        avatar: request.avatar,
-        lastMessage: request.message || "You are now connected",
-        time: 'Just now',
-        unread: 0,
-        isOnline: true,
-        isActive: true,
-        messages: [
-          {
-            id: 1,
-            text: request.message || "Hi! Thanks for accepting my request.",
-            time: request.time,
-            isUser: false,
-            type: 'text'
-          },
-          {
-            id: 2,
-            text: "You are now connected on Messenger",
-            time: "Now",
-            isUser: false,
-            type: 'notification'
-          }
-        ]
-      };
-
-      setState(prev => ({
-        ...prev,
-        receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId),
-        chats: [newChat, ...prev.chats],
-        activeChat: newChat,
-        messages: newChat.messages
-      }));
+    // Load appropriate data based on tab
+    if (tab === 'pending') {
+      await reloadSentRequests();
+    } else if (tab === 'requests') {
+      await loadIncomingRequests();
     }
   };
 
-  const rejectRequest = (requestId: number) => {
-    setState(prev => ({
-      ...prev,
-      receivedRequests: prev.receivedRequests.filter(req => req.id !== requestId)
-    }));
-  };
-
-  const removePendingRequest = (requestId: number) => {
-    setState(prev => ({
-      ...prev,
-      sentRequests: prev.sentRequests.filter(req => req.id !== requestId)
-    }));
-  };
-  
   const openSendRequestModal = async (user: any) => {
-  try {
-    // Ensure we're in requests section
-    if (state.activeSection !== 'requests') {
-      setActiveSection('requests');
-    }
-    
-    // Ensure we're on Pending tab
-    setRequestsActiveTab('pending');
-    
-    
-    // Show loading
-    setState(prev => ({ ...prev, isLoadingUser: true }));
-    
-    // Fetch full user details from public API
-    const userDetails = await getUserByIdAPI(user.id);
-    
-    if (userDetails) {
-      // Use data from getUserById
-      const fullUser = {
-        id: userDetails._id ,
-        name: userDetails.name,
-        username: userDetails.username,
-        email: userDetails.email,
-        avatar: userDetails.avatar, // Use helper
-        bio: userDetails.bio || '',
-        friends: userDetails.friends || []
-      };
-      
-      setState(prev => ({
-        ...prev,
-        showSendRequestModal: true,
-        selectedUserForRequest: fullUser,
-        requestMessage: `Hi ${userDetails.name}, I'd like to connect with you!`,
-        isLoadingUser: false
-      }));
-    } else {
-      // Fallback to search result data
+    try {
+      // Ensure we're in requests section
+      if (state.activeSection !== 'requests') {
+        setActiveSection('requests');
+      }
+
+      // Ensure we're on Pending tab
+      setRequestsActiveTab('pending');
+
+
+      // Show loading
+      setState(prev => ({ ...prev, isLoadingUser: true }));
+
+      // Fetch full user details from public API
+      const userDetails = await getUserByIdAPI(user.id);
+
+      if (userDetails) {
+        // Use data from getUserById
+        const fullUser = {
+          id: userDetails._id,
+          name: userDetails.name,
+          username: userDetails.username,
+          email: userDetails.email,
+          avatar: userDetails.avatar, // Use helper
+          bio: userDetails.bio || '',
+          friends: userDetails.friends || []
+        };
+
+        setState(prev => ({
+          ...prev,
+          showSendRequestModal: true,
+          selectedUserForRequest: fullUser,
+          requestMessage: `Hi ${userDetails.name}, I'd like to connect with you!`,
+          isLoadingUser: false
+        }));
+      } else {
+        // Fallback to search result data
+        setState(prev => ({
+          ...prev,
+          showSendRequestModal: true,
+          selectedUserForRequest: {
+            ...user,
+            avatar: user.avatar || null
+          },
+          requestMessage: `Hi ${user.name}, I'd like to connect with you!`,
+          isLoadingUser: false
+        }));
+      }
+
+    } catch (error) {
+      console.error('Failed to load user details:', error);
+      // Fallback
       setState(prev => ({
         ...prev,
         showSendRequestModal: true,
         selectedUserForRequest: {
           ...user,
-        avatar: user.avatar || null
+          avatar: user.avatar || null
         },
         requestMessage: `Hi ${user.name}, I'd like to connect with you!`,
         isLoadingUser: false
       }));
     }
-    
-  } catch (error) {
-    console.error('Failed to load user details:', error);
-    // Fallback
-    setState(prev => ({
-      ...prev,
-      showSendRequestModal: true,
-      selectedUserForRequest: {
-        ...user,
-        avatar: user.avatar || null
-      },
-      requestMessage: `Hi ${user.name}, I'd like to connect with you!`,
-      isLoadingUser: false
-    }));
-  }
-};
+  };
   const closeSendRequestModal = () => {
     setState(prev => ({
       ...prev,
@@ -2113,43 +1921,75 @@ const rejectFriendRequest = async (requestId: string) => {
   };
 
   const sendFriendRequest = async () => {
-  const { selectedUserForRequest, requestMessage } = state;
+    const { selectedUserForRequest, requestMessage } = state;
 
-  if (!selectedUserForRequest || !requestMessage.trim()) return;
+    if (!selectedUserForRequest || !requestMessage.trim()) return;
 
-  const baseRequest = {
-    receiverId: selectedUserForRequest.id,
-    name: selectedUserForRequest.name,
-    avatar:
-      selectedUserForRequest.avatar || 'https://i.pravatar.cc/150?img=1',
-    message: requestMessage,
-    time: 'Just now',
-    status: 'Pending'
-  };
+    const baseRequest = {
+      receiverId: selectedUserForRequest.id,
+      name: selectedUserForRequest.name,
+      avatar:
+        selectedUserForRequest.avatar || 'https://i.pravatar.cc/150?img=1',
+      message: requestMessage,
+      time: 'Just now',
+      status: 'Pending'
+    };
 
-  try {
-    // Start loading
-    setState(prev => ({ ...prev, isSendingRequest: true }));
+    try {
+      // Start loading
+      setState(prev => ({ ...prev, isSendingRequest: true }));
 
-    const response = await sendFriendRequestAPI(
-      selectedUserForRequest.id,
-      requestMessage
-    );
+      const response = await sendFriendRequestAPI(
+        selectedUserForRequest.id,
+        requestMessage
+      );
 
-    if (response?.detail === 'Friend request already exists') {
-      alert('Friend request already sent to this user');
-      return;
-    }
+      if (response?.detail === 'Friend request already exists') {
+        alert('Friend request already sent to this user');
+        return;
+      }
 
-    if (response?.detail === 'Friend request sent') {
-      const newSentRequest = {
-        id: response._id || selectedUserForRequest.id,
+      if (response?.detail === 'Friend request sent') {
+        const newSentRequest = {
+          id: response._id || selectedUserForRequest.id,
+          ...baseRequest
+        };
+
+        setState(prev => ({
+          ...prev,
+          sentRequests: [newSentRequest, ...prev.sentRequests],
+          showSendRequestModal: false,
+          selectedUserForRequest: null,
+          requestMessage: '',
+          isSendingRequest: false
+        }));
+
+        setRequestsActiveTab('pending');
+
+        // Sync with backend (non-blocking)
+        setTimeout(() => {
+          reloadSentRequests().catch(console.error);
+        }, 1000);
+
+        return;
+      }
+
+      // Fallback for unexpected responses
+      alert(response?.detail || 'Request sent');
+
+    } catch (error: any) {
+      console.error('Failed to send friend request:', error);
+      alert(error.message || 'Failed to send friend request');
+
+      // UI fallback (same as your current logic)
+      const fallbackRequest = {
+        id: selectedUserForRequest.id,
         ...baseRequest
       };
 
       setState(prev => ({
         ...prev,
-        sentRequests: [newSentRequest, ...prev.sentRequests],
+        sentRequests: [fallbackRequest, ...prev.sentRequests],
         showSendRequestModal: false,
         selectedUserForRequest: null,
         requestMessage: '',
@@ -2157,40 +1997,8 @@ const rejectFriendRequest = async (requestId: string) => {
       }));
 
       setRequestsActiveTab('pending');
-
-      // Sync with backend (non-blocking)
-      setTimeout(() => {
-        reloadSentRequests().catch(console.error);
-      }, 1000);
-
-      return;
     }
-
-    // Fallback for unexpected responses
-    alert(response?.detail || 'Request sent');
-
-  } catch (error: any) {
-    console.error('Failed to send friend request:', error);
-    alert(error.message || 'Failed to send friend request');
-
-    // UI fallback (same as your current logic)
-    const fallbackRequest = {
-      id: selectedUserForRequest.id,
-      ...baseRequest
-    };
-
-    setState(prev => ({
-      ...prev,
-      sentRequests: [fallbackRequest, ...prev.sentRequests],
-      showSendRequestModal: false,
-      selectedUserForRequest: null,
-      requestMessage: '',
-      isSendingRequest: false
-    }));
-
-    setRequestsActiveTab('pending');
-  }
-};
+  };
 
   // Check if user is already connected
   const isUserConnected = (userName: string) => {
@@ -2277,6 +2085,7 @@ const rejectFriendRequest = async (requestId: string) => {
                       <MessageItem
                         key={message.id}
                         message={message}
+                        chat={state.activeChat || { id: 0, conv_id: '', name: '', avatar: '', lastMessage: '', time: '', unread: 0, messages: [] }}
                         playingVoiceMessage={state.playingVoiceMessage}
                         onPlayVoiceMessage={playVoiceMessage}
                         onStopVoiceMessage={stopVoiceMessage}
@@ -2673,6 +2482,7 @@ const rejectFriendRequest = async (requestId: string) => {
                       <MessageItem
                         key={message.id}
                         message={message}
+                        chat={state.activeChat || { id: 0, conv_id: '', name: '', avatar: '', lastMessage: '', time: '', unread: 0, messages: [] }}
                         playingVoiceMessage={state.playingVoiceMessage}
                         onPlayVoiceMessage={playVoiceMessage}
                         onStopVoiceMessage={stopVoiceMessage}

@@ -72,3 +72,4 @@ export async function unsubscribePush(accessToken: string): Promise<string> {
         return "Unsubscribe failed";
     }
 }
+
