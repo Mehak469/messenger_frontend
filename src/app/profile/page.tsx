@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { authFetch } from "../../utils/authfetch"
 import './profile.css'
 
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+const API_BASE_URL = "https://messangersemesterproject-production.up.railway.app/api/v1"
 
 // Random colors for avatars (vibrant colors)
 const AVATAR_COLORS = [

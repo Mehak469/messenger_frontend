@@ -31,7 +31,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <WebSocketProvider>
+       <WebSocketProvider>
           {children} {/* ✅ now all children can access the socket context */}
         </WebSocketProvider>
         <ServiceWorkerRegistrar />

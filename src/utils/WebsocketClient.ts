@@ -15,7 +15,7 @@ export class WebSocketClient {
   }
 
   connect() {
-    this.socket = new WebSocket(`ws://localhost:8000/ws/${this.userId}`);
+    this.socket = new WebSocket(`wss://messangersemesterproject-production.up.railway.app/ws/${this.userId}`);
 
     this.socket.onopen = () => {
       console.log("[WS] Connected");

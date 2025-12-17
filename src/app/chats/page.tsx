@@ -32,7 +32,7 @@ import { useWebSocket } from '@/contexts/WebSocketContext'
 
 
 // const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+const API_BASE_URL = "https://messangersemesterproject-production.up.railway.app/api/v1"
 
 
 const initialStoriesData: Story[] = [

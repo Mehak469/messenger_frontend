@@ -23,7 +23,7 @@ export async function subscribePush(accessToken: string): Promise<string> {
 
         if (!subscription) return "Subscription failed";
 
-        const res = await fetch("http://127.0.0.1:8000/api/v1/users/subscribe", {
+        const res = await fetch("https://messangersemesterproject-production.up.railway.app/api/v1/users/subscribe", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -54,7 +54,7 @@ export async function unsubscribePush(accessToken: string): Promise<string> {
             await subscription.unsubscribe();
         }
 
-        const res = await fetch("http://127.0.0.1:8000/api/v1/users/unsubscribe", {
+        const res = await fetch("https://messangersemesterproject-production.up.railway.app/api/v1/users/unsubscribe", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${accessToken}`,
