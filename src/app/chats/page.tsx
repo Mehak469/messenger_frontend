@@ -822,6 +822,7 @@ export default function ChatsPage() {
     if (!wsClient) return;
 
     const handleNewMessage = (data: any) => {
+      console.log('[WS] new_message event received:', data);
       const msg = data.message;
 
       setState(prev => {
@@ -881,24 +882,51 @@ export default function ChatsPage() {
     };
 
     const handleMessageStatus = (data: any) => {
-      const { status, conversation_id } = data;
+      console.log('[WS] message_status event received:', data);
+      const { status, conversation_id, message_id } = data;
 
       setState(prev => {
-        if (prev.activeChat?.conv_id !== conversation_id) return prev;
+        // Update messages in the active chat if it matches
+        const updatedMessages = prev.activeChat?.conv_id === conversation_id
+          ? prev.messages.map(msg => {
+            if (
+              msg.isUser &&
+              ((msg.status === "sent" && (status === "delivered" || status === "seen")) ||
+                (msg.status === "delivered" && status === "seen"))
+            ) {
+              return { ...msg, status };
+            }
+            return msg;
+          })
+          : prev.messages;
 
-        const updatedMessages = prev.messages.map(msg => {
-          if (
-            msg.isUser &&
-            ((msg.status === "sent" && (status === "delivered" || status === "seen")) ||
-              (msg.status === "delivered" && status === "seen"))
-          ) {
-            return { ...msg, status };
+        // Also update the chat in the chats list (for when viewing other chats)
+        const updatedChats = prev.chats.map(chat => {
+          if (chat.conv_id === conversation_id) {
+            // Update the messages array stored in the chat object
+            const updatedChatMessages = chat.messages.map(msg => {
+              if (
+                msg.isUser &&
+                ((msg.status === "sent" && (status === "delivered" || status === "seen")) ||
+                  (msg.status === "delivered" && status === "seen"))
+              ) {
+                return { ...msg, status };
+              }
+              return msg;
+            });
+            return { ...chat, messages: updatedChatMessages };
           }
-          return msg;
+          return chat;
         });
-        return { ...prev, messages: updatedMessages };
+
+        return {
+          ...prev,
+          messages: updatedMessages,
+          chats: updatedChats
+        };
       });
     };
+
 
     // Register event listeners
     wsClient.on('new_message', handleNewMessage);
