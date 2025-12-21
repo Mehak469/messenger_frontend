@@ -790,22 +790,22 @@ export default function ChatsPage() {
   //mark delivered and mark seen
   useEffect(() => {
     if (!wsClient || !state.chats?.length) return;
-  
+
     // Send markDelivered only once (for all conversations collectively)
     // Assuming backend handles it per conversation if needed
     wsClient.markDelivered('all', 'all'); // or handle according to your wsClient API
-  
+
     // If there is an active chat, mark all as seen and reset unread locally
     if (state.activeChat) {
       const { conv_id: activeConvId, id: activeSenderId } = state.activeChat;
-  
+
       wsClient.markSeenAll(activeConvId, activeSenderId.toString());
-  
-      
+
+
       setState(prev => {
         // If activeChat exists, update its unread and corresponding chat in chats array
         if (!prev.activeChat) return prev;
-  
+
         return {
           ...prev,
           chats: prev.chats.map(c =>
@@ -816,7 +816,7 @@ export default function ChatsPage() {
       });
     }
   }, [state.activeChat?.conv_id, wsClient]);
-  
+
 
 
   // Helper functions
@@ -2064,65 +2064,65 @@ export default function ChatsPage() {
   }
 
 
-////
+  ////
 
-wsClient?.on('new_message', (data: any) => {
-  const msg = data.message;
+  wsClient?.on('new_message', (data: any) => {
+    const msg = data.message;
 
-  setState(prev => {
-    const transformedMsg: FetchedMessage = {
-      id: msg.id,
-      text: msg.content || '',
-      mediaUrl: msg.attachments?.[0],
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      isUser: false,
-      type: msg.message_type,
-      status: msg.status,
-    };
+    setState(prev => {
+      const transformedMsg: FetchedMessage = {
+        id: msg.id,
+        text: msg.content || '',
+        mediaUrl: msg.attachments?.[0],
+        time: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        isUser: false,
+        type: msg.message_type,
+        status: msg.status,
+      };
 
-    const isActiveChat = prev.activeChat?.conv_id === msg.conversation_id;
+      const isActiveChat = prev.activeChat?.conv_id === msg.conversation_id;
 
-    // 🔹 Update active messages immediately
-    const updatedMessages = isActiveChat
-      ? [...prev.messages, transformedMsg]
-      : prev.messages;
+      // 🔹 Update active messages immediately
+      const updatedMessages = isActiveChat
+        ? [...prev.messages, transformedMsg]
+        : prev.messages;
 
-    // 🔹 Update chats list (preview + unread)
-    const updatedChats = prev.chats.map(chat => {
-      if (chat.conv_id === msg.conversation_id) {
-        return {
-          ...chat,
-          unread: isActiveChat ? 0 : (chat.unread || 0) + 1,
-          lastMessage:
-            msg.message_type === 'text'
-              ? msg.content
-              : 'Media has been received',
-          time: transformedMsg.time,
-        };
-      }
-      return chat;
+      // 🔹 Update chats list (preview + unread)
+      const updatedChats = prev.chats.map(chat => {
+        if (chat.conv_id === msg.conversation_id) {
+          return {
+            ...chat,
+            unread: isActiveChat ? 0 : (chat.unread || 0) + 1,
+            lastMessage:
+              msg.message_type === 'text'
+                ? msg.content
+                : 'Media has been received',
+            time: transformedMsg.time,
+          };
+        }
+        return chat;
+      });
+
+      return {
+        ...prev,
+        messages: updatedMessages,
+        chats: updatedChats,
+      };
     });
 
-    return {
-      ...prev,
-      messages: updatedMessages,
-      chats: updatedChats,
-    };
-  });
+    // 🔹 Delivery / seen (kept same logic, but safe)
+    wsClient.markDelivered(msg.conversation_id, msg.sender_id);
 
-  // 🔹 Delivery / seen (kept same logic, but safe)
-  wsClient.markDelivered(msg.conversation_id, msg.sender_id);
-
-  setState(prev => {
-    if (prev.activeChat?.conv_id === msg.conversation_id) {
-      wsClient.markSeenAll(msg.conversation_id, msg.sender_id);
-    }
-    return prev;
+    setState(prev => {
+      if (prev.activeChat?.conv_id === msg.conversation_id) {
+        wsClient.markSeenAll(msg.conversation_id, msg.sender_id);
+      }
+      return prev;
+    });
   });
-});
 
 
 
