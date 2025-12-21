@@ -2066,65 +2066,64 @@ export default function ChatsPage() {
 
 ////
 
-  wsClient?.on('new_message', (data: any) => {
-    const msg = data.message;
+wsClient?.on('new_message', (data: any) => {
+  const msg = data.message;
 
-    setState(prev => {
-      const transformedMsg: FetchedMessage = {
-        id: msg.id,                     // backend ID
-        text: msg.content || '',
-        mediaUrl: msg.attachments?.[0], // optional media URL
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isUser: false,                   // received message
-        type: msg.message_type,
-        status: msg.status,
-      };
+  setState(prev => {
+    const transformedMsg: FetchedMessage = {
+      id: msg.id,
+      text: msg.content || '',
+      mediaUrl: msg.attachments?.[0],
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      isUser: false,
+      type: msg.message_type,
+      status: msg.status,
+    };
 
-      // 1️⃣ Active chat check
-      const isActiveChat = prev.activeChat?.conv_id === msg.conversation_id;
+    const isActiveChat = prev.activeChat?.conv_id === msg.conversation_id;
 
-      // 2️⃣ Update messages for active chat
-      const updatedMessages = isActiveChat
-        ? [...prev.messages, transformedMsg]
-        : prev.messages;
+    // 🔹 Update active messages immediately
+    const updatedMessages = isActiveChat
+      ? [...prev.messages, transformedMsg]
+      : prev.messages;
 
-      // 3️⃣ Update chats array
-      const updatedChats = prev.chats.map(chat => {
-        if (chat.conv_id === msg.conversation_id) {
-          const lastMessage =
+    // 🔹 Update chats list (preview + unread)
+    const updatedChats = prev.chats.map(chat => {
+      if (chat.conv_id === msg.conversation_id) {
+        return {
+          ...chat,
+          unread: isActiveChat ? 0 : (chat.unread || 0) + 1,
+          lastMessage:
             msg.message_type === 'text'
               ? msg.content
-              : 'Media has been received';
-
-          const newUnread = isActiveChat ? chat.unread : (chat.unread || 0) + 1;
-
-          return {
-            ...chat,
-            messages: [...chat.messages, transformedMsg],
-            unread: newUnread,
-            lastMessage,
-            time: transformedMsg.time,
-          };
-        }
-        return chat;
-      });
-
-      return {
-        ...prev,
-        messages: updatedMessages,
-        chats: updatedChats,
-      };
+              : 'Media has been received',
+          time: transformedMsg.time,
+        };
+      }
+      return chat;
     });
 
-    // --------------------------
-    // WebSocket status updates
-    // --------------------------
-    wsClient.markDelivered(msg.conversation_id, msg.sender_id);
+    return {
+      ...prev,
+      messages: updatedMessages,
+      chats: updatedChats,
+    };
+  });
 
-    if (state.activeChat?.conv_id === msg.conversation_id) {
+  // 🔹 Delivery / seen (kept same logic, but safe)
+  wsClient.markDelivered(msg.conversation_id, msg.sender_id);
+
+  setState(prev => {
+    if (prev.activeChat?.conv_id === msg.conversation_id) {
       wsClient.markSeenAll(msg.conversation_id, msg.sender_id);
     }
+    return prev;
   });
+});
+
 
 
   wsClient?.on("message_status", (data) => {
