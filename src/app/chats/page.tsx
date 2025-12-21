@@ -1011,7 +1011,7 @@ export default function ChatsPage() {
       time: currentTime,
       isUser: true,
       type: "text",
-      status: "sending" // will be updated when backend confirms
+      status: "sent" // ✅ Show single checkmark immediately
     };
 
     console.log("send message :", newMsg)
